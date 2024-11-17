@@ -10,8 +10,15 @@ VerseLogic<public> := module{
 
 # Asset Files
 Props<public> := module{
-    CreativeDevice<public> := module{
+    BaseAnchor<public> := module{
+        Blueprints<public> := module{}
         Materials<public> := module{}
+    }
+    CreativeDevice<public> := module{
+        Materials<public> := module{
+            Instances<public> := module{}
+        }
+        Meshes<public> := module{}
         Textures<public> := module{
             DeviceIcons<public> := module{}
         }
