@@ -75,7 +75,7 @@ InterfaceFeatures<public> := module {
         Bottom := Margin.Bottom / Value
     }
 
-    AnchorPressets<public> := module {
+    AnchorPresets<public> := module {
         TopLeft<public>():anchors = anchors{
             Minimum := vector2{X := 0.0, Y := 0.0}
             Maximum := vector2{X := 0.0, Y := 0.0}
@@ -128,7 +128,7 @@ InterfaceFeatures<public> := module {
         }
     }
 
-    AlignmentPressets<public> := module {
+    AlignmentPresets<public> := module {
         TopLeft<public>:vector2 = vector2{X := 0.0, Y := 0.0 }
         TopMiddle<public>:vector2 = vector2{X := 0.5, Y := 0.0 }
         TopRight<public>:vector2 = vector2{X := 1.0, Y := 0.0 }
@@ -140,7 +140,7 @@ InterfaceFeatures<public> := module {
         BottomRight<public>:vector2 = vector2{X := 1.0, Y := 1.0 }
     }
 
-    MarginPressets<public> := module {
+    MarginPresets<public> := module {
         NoMargin<public>()<transacts>:margin = margin{
             Left := 0.0
             Top := 0.0
@@ -245,7 +245,7 @@ InterfaceFeatures<public> := module {
         if (BackgroundOpacity > 0.0) {
             set OverlayElements += array{
                 overlay_slot{
-                    Padding := MarginPressets.SinglePixel() * BorderSize
+                    Padding := MarginPresets.SinglePixel() * BorderSize
                     HorizontalAlignment := horizontal_alignment.Fill
                     VerticalAlignment := vertical_alignment.Fill
                     Widget := color_block{
@@ -258,7 +258,7 @@ InterfaceFeatures<public> := module {
 
         set OverlayElements += array{
             overlay_slot{
-                Padding := ContentPadding? or MarginPressets.NoMargin()
+                Padding := ContentPadding? or MarginPresets.NoMargin()
                 HorizontalAlignment := horizontal_alignment.Center
                 VerticalAlignment := vertical_alignment.Center
                 Widget := Content
