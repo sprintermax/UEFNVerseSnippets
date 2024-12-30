@@ -124,6 +124,10 @@ VerseFeatures<public> := module {
         if (Index >= 0) { Input[Index] } else { Input[Input.Length + Index] }
     }
 
+    (Input:generator(t) where t:type).AsArray<public>()<computes>:[]t = {
+        for (Element : Input). Element
+    }
+
 
 
     ### Sorting Operations
