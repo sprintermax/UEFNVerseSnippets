@@ -9,24 +9,52 @@ UnrealEngineFeatures<public> := module {
     Vector2<public>(X:float, Y:float)<computes>:vector2 = vector2{ X := X, Y := Y }
     Vector2i<public>(Value:int)<computes>:vector2i = vector2i{ X := Value, Y := Value }
     Vector2i<public>(X:int, Y:int)<computes>:vector2i = vector2i{ X := X, Y := Y }
+
     Vector3<public>(Value:float)<computes>:vector3 = vector3{ X := Value, Y := Value, Z := Value }
     Vector3<public>(X:float, Y:float, Z:float)<computes>:vector3 = vector3{ X := X, Y := Y, Z := Z }
     Vector3i<public>(Value:int)<computes>:vector3i = vector3i{ X := Value, Y := Value, Z := Value }
     Vector3i<public>(X:int, Y:int, Z:int)<computes>:vector3i = vector3i{ X := X, Y := Y, Z := Z }
+
+    Vector4<public>(Value:float)<computes>:vector4 = vector4{ X := Value, Y := Value, Z := Value, W := Value }
+    Vector4<public>(X:float, Y:float, Z:float, W:float)<computes>:vector4 = vector4{ X := X, Y := Y, Z := Z, W := W }   
+    Vector4i<public>(Value:int)<computes>:vector4i = vector4i{ X := Value, Y := Value, Z := Value, W := Value }
+    Vector4i<public>(X:int, Y:int, Z:int, W:int)<computes>:vector4i = vector4i{ X := X, Y := Y, Z := Z, W := W }
 
     vector3i<public> := struct<computes>{
         X<public>:int = 0
         Y<public>:int = 0
         Z<public>:int = 0
     }
+    vector4<public> := struct<computes>{
+        X<public>:float = 0.0
+        Y<public>:float = 0.0
+        Z<public>:float = 0.0
+        W<public>:float = 0.0
+    }
+    vector4i<public> := struct<computes>{
+        X<public>:int = 0
+        Y<public>:int = 0
+        Z<public>:int = 0
+        W<public>:int = 0
+    }
 
     (Input:vector2).ToVector3<public>()<computes> : vector3 = vector3{ X := Input.X, Y := Input.Y }
     (Input:vector3).ToVector2<public>()<computes> : vector2 = vector2{ X := Input.X, Y := Input.Y }
+    (Input:vector3).ToVector4<public>()<computes> : vector4 = vector4{ X := Input.X, Y := Input.Y, Z := Input.Z }
+    (Input:vector4).ToVector3<public>()<computes> : vector3 = vector3{ X := Input.X, Y := Input.Y, Z := Input.Z }
     (Input:vector3i).ToVector3<public>()<computes> : vector3 = {
         return vector3{
             X := Input.X * 1.0
             Y := Input.Y * 1.0
             Z := Input.Z * 1.0
+        }
+    }
+    (Input:vector4i).ToVector4<public>()<computes> : vector4 = {
+        return vector4{
+            X := Input.X * 1.0
+            Y := Input.Y * 1.0
+            Z := Input.Z * 1.0
+            W := Input.W * 1.0
         }
     }
 

@@ -1,6 +1,3 @@
-# https://dev.epicgames.com/documentation/en-us/uefn/using-persistable-data-in-verse
-# https://dev.epicgames.com/documentation/en-us/uefn/persistent-player-statistics-in-unreal-editor-for-fortnite
-
 using { /Verse.org/Simulation }
 
 SessionPlayerData<public> := module {
