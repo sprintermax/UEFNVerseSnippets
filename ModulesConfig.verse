@@ -3,6 +3,7 @@ VerseLogic<public> := module{
     CreativeDevices<public> := module{}
     CustomClasses<public> := module{}
     ExtraModules<public> := module{}
+    GameplayLogic<public> := module{}
     SceneGraph<public> := module{
         Components<public> := module{}
     }

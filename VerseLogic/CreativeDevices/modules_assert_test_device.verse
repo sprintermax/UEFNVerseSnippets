@@ -6,6 +6,24 @@ using. /Verse.org/Simulation
 using. ExtraModules.DebugFeatures
 using. ExtraModules.VerseFeatures
 
+dummy_class := class<unique>{
+    A:int
+    B:int
+}
+
+AGreaterOrEqualsThanThree(Value:dummy_class)<transacts><decides>:void = {
+    Value.A >= 2
+}
+BGreaterThanFifty(Value:dummy_class)<transacts><decides>:void = {
+    Value.B >= 50
+}
+BGreaterThanA(Value:dummy_class)<transacts><decides>:void = {
+    Value.B > Value.A
+}
+AEqualsToB(Value:dummy_class)<transacts><decides>:void = {
+    Value.A = Value.B
+}
+
 modules_assert_test_device<internal> := class<final>(creative_device) {
 
     var TestID : string = ""
@@ -78,6 +96,14 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
             "F" => 5
         }
 
+        MapForCompare := map{
+            "A" => dummy_class{A := 1, B := 2}
+            "B" => dummy_class{A := 2, B := 3}
+            "C" => dummy_class{A := 4, B := 3}
+            "D" => dummy_class{A := 6, B := 5}
+            "E" => dummy_class{A := 7, B := 7}
+        }
+
         Assert("Should silently pass when trying to delete inexistent key from map")
         if (ABC123Map.RemoveByKey["D"]). Pass()
         else. Fail()
@@ -125,7 +151,7 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
         Assert("Should fail due to no keys found where the associated values matches specified value with strict mode")
         if (ABC123Map.FindKeysByValue[4, ?Strict := true]). Fail()
         else. Pass()
-        
+
         Assert("Should return an array with all keys where the associated values matches specified value")
         if (ConcatenateMaps(ABC123Map, DEF345Map).FindKeysByValue[3] = array{"C", "D"}). Pass()
         else. Fail()
@@ -144,6 +170,32 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
             "D" => 3
         }). Pass()
         else. Fail()
+
+        # Assert("Should fail due to no elements that matches comparer function")
+        # if (MapForCompare.FindKeyByValueData[BGreaterThanFifty]). Fail()
+        # else. Pass()
+
+        # Assert("Should return map with first element that matches comparer function")
+        # if (MapForCompare.FindKeyByValueData[AGreaterOrEqualsThanThree] = map{
+        #     "C" => dummy_class{A := 4, B := 3}
+        # }). Pass()
+        # else. Fail()
+        
+        # Assert("Should silently pass with an empty map when no elements matches specified comparer function")
+        # if (MapForCompare.FindKeysByValueData[BGreaterThanFifty]). Pass()
+        # else. Fail()
+
+        # Assert("Should fail due to no elements matches specified comparer function with strict mode")
+        # if (MapForCompare.FindKeysByValueData[BGreaterThanFifty, ?Strict := true]). Fail()
+        # else. Pass()
+
+        # Assert("Should return map with only the elements that matches specified comparer function")
+        # if (MapForCompare.FindKeysByValueData[AGreaterOrEqualsThanThree] = map{
+        #     "C" => dummy_class{A := 4, B := 3}
+        #     "D" => dummy_class{A := 6, B := 5}
+        #     "E" => dummy_class{A := 7, B := 7}
+        # }). Pass()
+        # else. Fail()
 
         ### Array Operations
         Sleep(0.0)
@@ -178,13 +230,13 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
 
         ### Sorting Operations
 
-        # Assert("Ascending sort of Test826Array should be 'array\{2, 6, 8\}'")
-        # if (Test826Array.QuickSort(SortIntDefaultComparer) = array{2, 6, 8}). Pass()
-        # else. Fail()
+        Assert("Ascending sort of Test826Array should be 'array\{2, 6, 8\}'")
+        if (Test826Array.MergeSort(SortIntAscending) = array{2, 6, 8}). Pass()
+        else. Fail()
 
-        # Assert("Descending sort of Test826Array should be 'array\{8, 6, 2\}'")
-        # if (Test826Array.QuickSort(SortIntDefaultComparer, ?IsAscending := false) = array{8, 6, 2}). Pass()
-        # else. Fail()
+        Assert("Descending sort of Test826Array should be 'array\{8, 6, 2\}'")
+        if (Test826Array.MergeSort(SortIntDescending) = array{8, 6, 2}). Pass()
+        else. Fail()
 
         ### Containers
 

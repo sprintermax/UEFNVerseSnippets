@@ -4,7 +4,7 @@ VerseFeatures<public> := module {
 
     ### Logic Utils
 
-    Success<public>()<computes><decides>:void = true? # true? crashes compiler
+    Success<public>()<computes><decides>:void = true?
     Failure<public>()<computes><decides>:void = false?
 
     (VerseFeatures:)ToString<public>(Input:logic)<computes>:string = {
@@ -28,21 +28,21 @@ VerseFeatures<public> := module {
     ### Map Operations
     
     # Returns an array with all keys of the map
-    (Input:[keytype]valuetype where keytype:subtype(comparable), valuetype:type).Keys<public>()<computes>:[]keytype = {
+    (Input:[k]v where k:subtype(comparable), v:type).Keys<public>()<computes>:[]k = {
         for (CurrentKey->Unused : Input). CurrentKey
     }
 
     # Returns an array with all values of the map
-    (Input:[keytype]valuetype where keytype:subtype(comparable), valuetype:type).Values<public>()<computes>:[]valuetype = {
+    (Input:[k]v where k:subtype(comparable), v:type).Values<public>()<computes>:[]v = {
         for (CurrentValue : Input). CurrentValue
     }
 
     # Returns a map without the map element that Key matches the Key provided
     # If Strict is set to true, will force a fail when key does not exist on the map
-    (Input:[keytype]valuetype where keytype:subtype(comparable), valuetype:type).RemoveByKey<public>(KeyToRemove: keytype, ?Strict:logic=false)<transacts><decides>:[keytype]valuetype = {
+    (Input:[k]v where k:subtype(comparable), v:type).RemoveByKey<public>(KeyToRemove: k, ?Strict:logic=false)<transacts><decides>:[k]v = {
         if (Strict?). Input[KeyToRemove]
 
-        var TempMap:[keytype]valuetype = map{}
+        var TempMap:[k]v = map{}
         for (
             CurrentKey->CurrentValue:Input
             CurrentKey <> KeyToRemove
@@ -51,8 +51,8 @@ VerseFeatures<public> := module {
     }
 
     # Returns a map without all map elements that Key matches the Keys provided
-    (Input:[keytype]valuetype where keytype:subtype(comparable), valuetype:type).RemoveByKeys<public>(KeysToRemove: []keytype)<transacts><decides>:[keytype]valuetype = {
-        var TempMap:[keytype]valuetype = Input
+    (Input:[k]v where k:subtype(comparable), v:type).RemoveByKeys<public>(KeysToRemove: []k)<transacts><decides>:[k]v = {
+        var TempMap:[k]v = Input
         for (KeyToRemove : KeysToRemove) {
             ResultMap := TempMap.RemoveByKey[KeyToRemove, ?Strict := false] # Strict default value is already false on the function definition and due to that is not a required argument, but if not mentioned again here, for some reason it crashes the server
             set TempMap = ResultMap
@@ -61,8 +61,8 @@ VerseFeatures<public> := module {
     }
 
     # Returns a map with only the elements that Key matches the Keys provided
-    (Input:[keytype]valuetype where keytype:subtype(comparable), valuetype:type).FilterByKeys<public>(Keys: []keytype)<transacts><decides>:[keytype]valuetype = {
-        var TempMap:[keytype]valuetype = map{}
+    (Input:[k]v where k:subtype(comparable), v:type).FilterByKeys<public>(Keys: []k)<transacts><decides>:[k]v = {
+        var TempMap:[k]v = map{}
         for (
             CurrentKey->CurrentValue:Input
             KeyToCompare : Keys
@@ -72,8 +72,8 @@ VerseFeatures<public> := module {
     }
 
     # Returns the first map Key where the associated Value matches the provided Value
-    (Input:[keytype]valuetype where keytype:subtype(comparable), valuetype:subtype(comparable)).FindKeyByValue<public>(Value: valuetype)<transacts><decides>:keytype = {
-        var MaybeKey:?keytype = false
+    (Input:[k]v where k:subtype(comparable), v:subtype(comparable)).FindKeyByValue<public>(Value: v)<transacts><decides>:k = {
+        var MaybeKey:?k = false
         for (
             CurrentKey->CurrentValue:Input
             not MaybeKey?
@@ -84,8 +84,8 @@ VerseFeatures<public> := module {
 
     # Returns all map Keys where the associated Value matches the provided Value
     # If Strict is set to true, will force a fail when none of the values exist on the map
-    (Input:[keytype]valuetype where keytype:subtype(comparable), valuetype:subtype(comparable)).FindKeysByValue<public>(Value: valuetype, ?Strict:logic=false)<transacts><decides>:[]keytype = {
-        var KeysFound:[]keytype = array{}
+    (Input:[k]v where k:subtype(comparable), v:subtype(comparable)).FindKeysByValue<public>(Value: v, ?Strict:logic=false)<transacts><decides>:[]k = {
+        var KeysFound:[]k = array{}
         for (
             CurrentKey->CurrentValue:Input
             CurrentValue = Value
@@ -98,8 +98,8 @@ VerseFeatures<public> := module {
 
     # return a map with only the elements that Value matches the Values provided
     # If Strict is set to true, will force a fail when none of the values exist on the map
-    (Input:[keytype]valuetype where keytype:subtype(comparable), valuetype:subtype(comparable)).FilterByValues<public>(Values: []valuetype, ?Strict:logic=false)<transacts><decides>:[keytype]valuetype = {
-        var TempMap:[keytype]valuetype = map{}
+    (Input:[k]v where k:subtype(comparable), v:subtype(comparable)).FilterByValues<public>(Values: []v, ?Strict:logic=false)<transacts><decides>:[k]v = {
+        var TempMap:[k]v = map{}
         for (
             CurrentKey->CurrentValue:Input
             ValueToCompare : Values
@@ -113,23 +113,27 @@ VerseFeatures<public> := module {
 
     # UNTESTED
     # Returns the first map Key where the Value succeeds the provided comparer function
-    # (Input:[keytype]valuetype).FindKeyByValueData<public>(Value: valuetype where keytype:subtype(comparable), valuetype:subtype(comparable))<transacts><decides>:keytype = {
-    #     var MaybeKey:?keytype = false
+    # (Input:[k]v where k:subtype(comparable), v:subtype(any)).FindKeyByValueData<public>(Comparer:type{_(:v)<transacts><decides>:void})<transacts><decides>:k = {
+    #     var MaybeKey:?k = false
     #     for (
     #         CurrentKey->CurrentValue:Input
     #         not MaybeKey?
-    #         CurrentValue = Value
+    #         Comparer[CurrentValue]
     #     ). set MaybeKey = option{CurrentKey}
     #     MaybeKey?
     # }
 
     # Returns all map Keys where the Value succeeds the provided comparer function
-    # (Input:[keytype]valuetype).FindKeysByValueData<public>(Value: valuetype where keytype:subtype(comparable), valuetype:subtype(comparable))<transacts>:[]keytype = {
-    #     var KeysFound:[]keytype = array{}
+    # If Strict is set to true, will force a fail when no compatible values exist on the map
+    # (Input:[k]v where k:subtype(comparable), v:subtype(any)).FindKeysByValueData<public>(Comparer:type{_(:v)<transacts><decides>:void}, ?Strict:logic=false)<transacts><decides>:[]k = {
+    #     var KeysFound:[]k = array{}
     #     for (
     #         CurrentKey->CurrentValue:Input
-    #         CurrentValue = Value
+    #         Comparer[CurrentValue]
     #     ). set KeysFound += array{CurrentKey}
+        
+    #     KeysFound.Length <> 0 or not Strict?
+
     #     KeysFound
     # }
 
@@ -166,32 +170,95 @@ VerseFeatures<public> := module {
 
     ### Sorting Operations
 
-    (Input:[]t where t:type).QuickSort<public>(Comparer : type{_(:t, :t)<computes> : int}, ?IsAscending : logic = true)<computes> : []t = {
-        if (Input.Length > 1, Pivot := Input[Floor(Input.Length/2)]) {
-            
-            Left := for (Element : Input, Comparer(Element, Pivot) < 0) { Element }
-            Middle := for (Element : Input, Comparer(Element, Pivot) = 0) { Element }
-            Right := for (Element : Input, Comparer(Element, Pivot) > 0) { Element }
+    (Input:[]t where t:type).MergeSort<public>(Less : type{_(:t, :t)<decides><transacts>:void})<transacts> : []t = {
+        Length := Input.Length
 
-            if (IsAscending?). Left.QuickSort(Comparer, ?IsAscending := IsAscending) + Middle + Right.QuickSort(Comparer, ?IsAscending := IsAscending)
-            else. Right.QuickSort(Comparer, ?IsAscending := IsAscending) + Middle + Left.QuickSort(Comparer, ?IsAscending := IsAscending)
+        if (
+            Length > 1
+            Pivot := Floor(Length/2)
+            LeftPart := Input.Slice[0, Pivot]
+            RightPart := Input.Slice[Pivot]
+        ) {
+            
+            LeftSorted := LeftPart.MergeSort(Less)
+            RightSorted := RightPart.MergeSort(Less)
+
+            var LeftIndex : int = 0
+            var RightIndex : int = 0
+            var MergedArray : []t = array{}
+
+            loop {
+                if (LeftElement := LeftSorted[LeftIndex], RightElement := RightSorted[RightIndex]) {
+
+                    if (Less[LeftElement, RightElement]) {
+                        set MergedArray += array{LeftElement}
+                        set LeftIndex += 1
+                    } else {
+                        set MergedArray += array{RightElement}
+                        set RightIndex += 1
+                    }
+
+                } else {
+
+                    if (LeftIndex >= LeftSorted.Length) {
+                        option{set MergedArray += RightSorted.Slice[RightIndex]}
+                    } else {
+                        option{set MergedArray += LeftSorted.Slice[LeftIndex]}
+                    }
+
+                    break
+                }
+            }
+
+            MergedArray
 
         } else { Input }
     }
 
-    SortIntDefaultComparer<public>(A:int, B:int)<computes> : int = {
-        if (A < B). -1
-        else if (A > B). 1
-        else 0
+    SortIntAscending<public>(Left:int, Right:int)<decides><transacts>:void = {
+        Left < Right
     }
 
-    SortFloatDefaultComparer<public>(A:float, B:float)<computes> : int = {
-        if (A < B). -1
-        else if (A > B). 1
-        else 0
+    SortIntDescending<public>(Left:int, Right:int)<decides><transacts>:void = {
+        Left > Right
     }
 
-    
+    SortFloatAscending<public>(Left:float, Right:float)<decides><transacts>:void = {
+        Left < Right
+    }
+
+    SortFloatDescending<public>(Left:float, Right:float)<decides><transacts>:void = {
+        Left > Right
+    }
+
+
+    # OBSOLETE NEEDS REWORK
+    # (Input:[]t where t:type).Sort<public>(Comparer : type{_(:t, :t)<computes> : int}, ?IsAscending : logic = true)<computes> : []t = {
+    #     if (Input.Length > 1, Pivot := Input[Floor(Input.Length/2)]) {
+            
+    #         Left := for (Element : Input, Comparer(Element, Pivot) < 0) { Element }
+    #         Middle := for (Element : Input, Comparer(Element, Pivot) = 0) { Element }
+    #         Right := for (Element : Input, Comparer(Element, Pivot) > 0) { Element }
+
+    #         if (IsAscending?). Left.Sort(Comparer, ?IsAscending := IsAscending) + Middle + Right.Sort(Comparer, ?IsAscending := IsAscending)
+    #         else. Right.Sort(Comparer, ?IsAscending := IsAscending) + Middle + Left.Sort(Comparer, ?IsAscending := IsAscending)
+
+    #     } else { Input }
+    # }
+
+    # SortIntDefaultComparer<public>(A:int, B:int)<computes> : int = {
+    #     if (A < B). -1
+    #     else if (A > B). 1
+    #     else 0
+    # }
+
+    # SortFloatDefaultComparer<public>(A:float, B:float)<computes> : int = {
+    #     if (A < B). -1
+    #     else if (A > B). 1
+    #     else 0
+    # }
+
+
 
     ### Containers
 
@@ -231,7 +298,7 @@ VerseFeatures<public> := module {
 
         IsNegative := if (String[0] = '-') { true } else { false }
 
-        for (Index->Char : String.Reverse()) {
+        for (Index->Char : ReversedString) {
             if (Index <> Length - 1 or not IsNegative?) {
                 CurrentDigit := CharToIntMap[Char]
                 set IntegerNumber += CurrentDigit * Int[Pow(10.0, Index * 1.0)]
