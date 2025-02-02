@@ -1,4 +1,4 @@
-using { /UnrealEngine.com/Temporary/SpatialMath }
+using. /UnrealEngine.com/Temporary/SpatialMath
 
 UnrealEngineFeatures<public> := module {
 
@@ -192,7 +192,7 @@ UnrealEngineFeatures<public> := module {
             }
         }
 
-        DeCasteljau_3DV2(Points:[]vector3, Position:float)<transacts><decides>:vector3 = {
+        DeCasteljau_3DV2<public>(Points:[]vector3, Position:float)<transacts><decides>:vector3 = {
             var Midpoints : []vector3 = Points
 
             loop {

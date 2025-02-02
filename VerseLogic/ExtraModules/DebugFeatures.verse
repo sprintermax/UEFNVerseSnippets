@@ -1,6 +1,6 @@
-using { /Verse.org/Colors }
-using { /Verse.org/Simulation }
-using { /UnrealEngine.com/Temporary/Diagnostics }
+using. /Verse.org/Colors
+using. /Verse.org/Simulation
+using. /UnrealEngine.com/Temporary/Diagnostics
 
 # I don't use this anymore, made for testing but daily usage of this on projects were not good enough.
 DebugFeatures<public> := module {

@@ -1,4 +1,4 @@
-using { /UnrealEngine.com/Temporary/UI }
+using. /UnrealEngine.com/Temporary/UI
 
 VerseFeatures<public> := module {
 
@@ -6,6 +6,17 @@ VerseFeatures<public> := module {
 
     Success<public>()<computes><decides>:void = true?
     Failure<public>()<computes><decides>:void = false?
+
+    PrintAndFail<public>(Message:string)<transacts><decides>:void = {
+        Print(Message)
+        Failure[]
+    }
+
+    PrintAndFail<public>(Message:string, Value:t where t :subtype(any))<transacts><decides>:t = {
+        Print(Message)
+        Failure[]
+        Err("Unreachable")
+    }
 
     (VerseFeatures:)ToString<public>(Input:logic)<computes>:string = {
         if (Input?) { "true" } else { "false" }
@@ -111,31 +122,30 @@ VerseFeatures<public> := module {
         TempMap
     }
 
-    # UNTESTED
-    # Returns the first map Key where the Value succeeds the provided comparer function
-    # (Input:[k]v where k:subtype(comparable), v:subtype(any)).FindKeyByValueData<public>(Comparer:type{_(:v)<transacts><decides>:void})<transacts><decides>:k = {
-    #     var MaybeKey:?k = false
-    #     for (
-    #         CurrentKey->CurrentValue:Input
-    #         not MaybeKey?
-    #         Comparer[CurrentValue]
-    #     ). set MaybeKey = option{CurrentKey}
-    #     MaybeKey?
-    # }
+    # Returns the first map Key where the Value succeeds the provided condition function
+    (Input:[k]v where k:subtype(comparable), v:subtype(any)).FindKeyByValueData<public>(Condition:type{_(:v)<transacts><decides>:void})<transacts><decides>:k = {
+        var MaybeKey:?k = false
+        for (
+            CurrentKey->CurrentValue:Input
+            not MaybeKey?
+            Condition[CurrentValue]
+        ). set MaybeKey = option{CurrentKey}
+        MaybeKey?
+    }
 
-    # Returns all map Keys where the Value succeeds the provided comparer function
+    # Returns all map Keys where the Value succeeds the provided condition function
     # If Strict is set to true, will force a fail when no compatible values exist on the map
-    # (Input:[k]v where k:subtype(comparable), v:subtype(any)).FindKeysByValueData<public>(Comparer:type{_(:v)<transacts><decides>:void}, ?Strict:logic=false)<transacts><decides>:[]k = {
-    #     var KeysFound:[]k = array{}
-    #     for (
-    #         CurrentKey->CurrentValue:Input
-    #         Comparer[CurrentValue]
-    #     ). set KeysFound += array{CurrentKey}
+    (Input:[k]v where k:subtype(comparable), v:subtype(any)).FindKeysByValueData<public>(Condition:type{_(:v)<transacts><decides>:void}<#, ?Strict:logic=false#>)<transacts><decides>:[]k = {
+        var KeysFound:[]k = array{}
+        for (
+            CurrentKey->CurrentValue:Input
+            Condition[CurrentValue]
+        ). set KeysFound += array{CurrentKey}
         
-    #     KeysFound.Length <> 0 or not Strict?
+        <#KeysFound.Length <> 0 or not Strict?#>
 
-    #     KeysFound
-    # }
+        KeysFound
+    }
 
 
 

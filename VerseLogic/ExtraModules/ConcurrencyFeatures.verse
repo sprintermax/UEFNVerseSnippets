@@ -1,4 +1,4 @@
-using { /Verse.org/Simulation }
+using. /Verse.org/Simulation
 
 ConcurrencyFeatures<public> := module {
 

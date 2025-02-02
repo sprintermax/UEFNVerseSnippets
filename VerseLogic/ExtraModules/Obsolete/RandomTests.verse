@@ -1,25 +1,23 @@
 # This file may contain untested stuff, that may not have correct or expected behavior
 
-using { /UnrealEngine.com/Temporary/SpatialMath }
-using { /Verse.org/Random }
+using. /UnrealEngine.com/Temporary/SpatialMath
+using. /Verse.org/Random
 
-using { MathFeatures }
-using { UnrealEngineFeatures }
-using { VerseFeatures }
+using. MathFeatures
+using. UnrealEngineFeatures
+using. VerseFeatures
 
 RandomTests<public> := module {
 
     Binary<public> := module {
 
-        binary_int32<public> := struct<concrete> {
-            BitArray<public> : []logic = for (X := 0..31) { false }
-        }
+        # binary_int32<public> := struct<concrete> {
+        #     BitArray<public> : []logic = for (X := 0..31) { false }
+        # }
 
-        binary_float32<public> := struct<concrete> {
-            BitArray<public> : []logic = for (X := 0..31) { false }
-        }
-
-
+        # binary_float32<public> := struct<concrete> {
+        #     BitArray<public> : []logic = for (X := 0..31) { false }
+        # }
 
 
 
@@ -58,9 +56,7 @@ RandomTests<public> := module {
 
 
 
-
-
-
+        ##################
 
 
         binary_int<public> := struct<concrete> {
@@ -68,31 +64,31 @@ RandomTests<public> := module {
             BitArray<public> : []char = array{}
         }
 
-        BitwiseAnd<public>(InputA : int, InputB : int)<transacts><decides> : int = {
-            return BinaryToInt[binary_int{
-                BitArray := BitwiseAnd[IntToBinary[InputA].BitArray, IntToBinary[InputB].BitArray]
-            }]
+        BitwiseAnd<public>(InputA : int, InputB : int)<transacts> : int = {
+            return BinaryToInt(binary_int{
+                BitArray := BitwiseAnd(IntToBinary(InputA).BitArray, IntToBinary(InputB).BitArray)
+            })
         }
 
-        BitwiseOr<public>(InputA : int, InputB : int)<transacts><decides> : int = {
-            return BinaryToInt[binary_int{
-                BitArray := BitwiseOr[IntToBinary[InputA].BitArray, IntToBinary[InputB].BitArray]
-            }]
+        BitwiseOr<public>(InputA : int, InputB : int)<transacts> : int = {
+            return BinaryToInt(binary_int{
+                BitArray := BitwiseOr(IntToBinary(InputA).BitArray, IntToBinary(InputB).BitArray)
+            })
         }
 
-        BitwiseXor<public>(InputA : int, InputB : int)<transacts><decides> : int = {
-            return BinaryToInt[binary_int{
-                BitArray := BitwiseXor[IntToBinary[InputA].BitArray, IntToBinary[InputB].BitArray]
-            }]
+        BitwiseXor<public>(InputA : int, InputB : int)<transacts> : int = {
+            return BinaryToInt(binary_int{
+                BitArray := BitwiseXor(IntToBinary(InputA).BitArray, IntToBinary(InputB).BitArray)
+            })
         }
 
-        BitwiseNot<public>(Input : int)<transacts><decides> : int = {
-            return BinaryToInt[binary_int{
-                BitArray := BitwiseNot[IntToBinary[Input].BitArray]
-            }]
+        BitwiseNot<public>(Input : int)<transacts> : int = {
+            return BinaryToInt(binary_int{
+                BitArray := BitwiseNot(IntToBinary(Input).BitArray)
+            })
         }
 
-        BitwiseAnd<public>(InputA : []char, InputB : []char)<transacts><decides> : []char = {
+        BitwiseAnd<public>(InputA : []char, InputB : []char)<transacts> : []char = {
             Result := for (Index := 0..Max(InputA.Length, InputB.Length)-1) {
                 if (InputA.Reverse()[Index] = '1' and InputB.Reverse()[Index] = '1') {
                     '1'
@@ -104,7 +100,7 @@ RandomTests<public> := module {
             return Result.Reverse()
         }
 
-        BitwiseOr<public>(InputA : []char, InputB : []char)<transacts><decides> : []char = {
+        BitwiseOr<public>(InputA : []char, InputB : []char)<transacts> : []char = {
             Result := for (Index := 0..Max(InputA.Length, InputB.Length)-1) {
                 if (InputA.Reverse()[Index] = '1' or InputB.Reverse()[Index] = '1') {
                     '1'
@@ -116,7 +112,7 @@ RandomTests<public> := module {
             return Result.Reverse()
         }
 
-        BitwiseXor<public>(InputA : []char, InputB : []char)<transacts><decides> : []char = {
+        BitwiseXor<public>(InputA : []char, InputB : []char)<transacts> : []char = {
             Result := for (Index := 0..Max(InputA.Length, InputB.Length)-1) {
                 if ((InputA.Reverse()[Index] = '1' and (InputB.Reverse()[Index] = '0' or not InputB.Reverse()[Index])) or ((InputA.Reverse()[Index] = '0' or not InputA.Reverse()[Index]) and InputB.Reverse()[Index] = '1')) {
                     '1'
@@ -128,7 +124,7 @@ RandomTests<public> := module {
             return Result.Reverse()
         }
 
-        BitwiseNot<public>(Input : []char)<transacts><decides> : []char = {
+        BitwiseNot<public>(Input : []char)<transacts> : []char = {
             Result := for (Index := 0..Input.Length-1) {
                 if (Input[Index] = '0') {
                     '1'
@@ -148,7 +144,7 @@ RandomTests<public> := module {
             Int[Input / Pow(2.0, Bits * 1.0)]
         }
 
-        LeftShift<public>(Input : []char, Bits : int)<transacts><decides> : []char = { # <<
+        LeftShift<public>(Input : []char, Bits : int)<transacts> : []char = { # <<
             var BitArray : []char = Input
 
             for (X := 0..Bits-1) {
@@ -158,7 +154,7 @@ RandomTests<public> := module {
             BitArray
         }
 
-        RightShift<public>(Input : []char, Bits : int)<transacts><decides> : []char = { # >>
+        RightShift<public>(Input : []char, Bits : int)<transacts> : []char = { # >>
             var BitArray : []char = Input
 
             for (X := 0..Bits-1) {
@@ -168,7 +164,7 @@ RandomTests<public> := module {
             BitArray
         }
 
-        UnclampedRightShift<public>(Input : []char, Bits : int)<transacts><decides> : []char = { # <<
+        UnclampedRightShift<public>(Input : []char, Bits : int)<transacts> : []char = { # <<
             var BitArray : []char = Input
 
             for (X := 0..Bits-1) {
@@ -178,7 +174,7 @@ RandomTests<public> := module {
             BitArray
         }
 
-        ClampedLeftShift<public>(Input : []char, Bits : int)<transacts><decides> : []char = { # <<
+        ClampedLeftShift<public>(Input : []char, Bits : int)<transacts> : []char = { # <<
             var BitArray : []char = Input
 
             for (X := 0..Bits-1) {
@@ -188,7 +184,7 @@ RandomTests<public> := module {
             BitArray
         }
 
-        ClampedCarriedRightShift<public>(Input : []char, Bits : int)<transacts><decides> : []char = { # >>
+        ClampedCarriedRightShift<public>(Input : []char, Bits : int)<transacts> : []char = { # >>
             var BitArray : []char = Input
 
             for (X := 0..Bits-1) {
@@ -198,7 +194,7 @@ RandomTests<public> := module {
             BitArray
         }
 
-        BinaryToInt<public>(Input : binary_int)<transacts><decides> : int = {
+        BinaryToInt<public>(Input : binary_int)<transacts> : int = {
             var Result : int = 0
             for (Index->Char : Input.BitArray.Reverse()) {
                 if (Val := CharToIntMap[Char] * Int[Pow(2.0, Index*1.0)]). set Result += Val
@@ -211,7 +207,7 @@ RandomTests<public> := module {
             return Result
         }
 
-        IntToBinary<public>(Input:int)<transacts><decides> : binary_int = {
+        IntToBinary<public>(Input:int)<transacts> : binary_int = {
             var n : int = if (Input < 0) { Input * -1 } else { Input }
             var a : int = 0
             var i : int = 0
@@ -236,6 +232,7 @@ RandomTests<public> := module {
         }
     }
 
+    
     NoiseUtils<public> := module {
 
         PerlinPermutations<public> : []int = array{ 151,160,137,91,90,15,
@@ -300,7 +297,7 @@ RandomTests<public> := module {
                 }
 
                 for (i:=0..511) {
-                    if (Val := Binary.BitwiseAnd[i, 255], set perm[i] = Val) {}
+                    if (Val := Binary.BitwiseAnd(i, 255), set perm[i] = Val) {}
                     if (Val := Mod[perm[i], 12], set permMod12[i] = Val) {}
                 }
             }
@@ -338,8 +335,8 @@ RandomTests<public> := module {
                 x2 : float = x0 - 1.0 + 2.0 * G2
                 y2 : float = y0 - 1.0 + 2.0 * G2
 
-                ii : int = Binary.BitwiseAnd[i, 255]
-                jj : int = Binary.BitwiseAnd[j, 255]
+                ii : int = Binary.BitwiseAnd(i, 255)
+                jj : int = Binary.BitwiseAnd(j, 255)
                 gi0 : int = permMod12[ii+perm[jj]]
                 gi1 : int = permMod12[ii+i1+perm[jj+j1]]
                 gi2 : int = permMod12[ii+1+perm[jj+1]]

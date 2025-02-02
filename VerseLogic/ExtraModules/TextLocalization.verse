@@ -1,4 +1,4 @@
-using { /Verse.org/Simulation }
+using. /Verse.org/Simulation
 
 TextLocalization<public> := module {
     ### Generic conversion methods
@@ -93,17 +93,21 @@ TextLocalization<public> := module {
     Loc_Currency_ExperiencePoints_Name<public><localizes>:message = "Experience Points"
 
     ### Date and Time
-    Loc_Time_ClockFormat<public>(Seconds:float, ?DisplayMiliseconds:logic = false):string = {
+    Loc_Time_ClockFormat<public>(Seconds:float, ?DisplayMiliseconds:logic = false)<transacts>:string = {
         var TimeString : string = "??:??:??"
         if (
-            ClampedSeconds := Abs(Floor[Seconds])
-            TimeSeconds := Abs(Mod[ClampedSeconds, 60])
-            TimeMinutesTotal := Abs(Floor(ClampedSeconds / 60))
-            TimeMinutes := Abs(Mod[Floor(ClampedSeconds / 60), 60])
-            TimeHours := Abs(Floor(TimeMinutesTotal / 60))
+            AbsSeconds := Abs(Seconds)
+            ClampedSeconds := Floor[AbsSeconds]
+            TimeSeconds := Mod[ClampedSeconds, 60]
+            TimeMinutesTotal := Floor(ClampedSeconds / 60)
+            TimeMinutes := Mod[Floor(ClampedSeconds / 60), 60]
+            TimeHours := Floor(TimeMinutesTotal / 60)
         ) {
-            if (TimeHours >= 10). set TimeString = "{TimeHours}:"
-            else. set TimeString = "0{TimeHours}:"
+            if (Seconds < 0.0). set TimeString = "-"
+            else. set TimeString = ""
+
+            if (TimeHours >= 10). set TimeString += "{TimeHours}:"
+            else. set TimeString += "0{TimeHours}:"
 
             if (TimeMinutes >= 10). set TimeString += "{TimeMinutes}:"
             else. set TimeString += "0{TimeMinutes}:"
@@ -112,7 +116,7 @@ TextLocalization<public> := module {
             else. set TimeString += "0{TimeSeconds}"
 
             if (DisplayMiliseconds?) {
-                TimeMiliseconds := Floor[(Seconds - ClampedSeconds * 1.0) * 1000] or 0
+                TimeMiliseconds := Round[(AbsSeconds - ClampedSeconds * 1.0) * 1000] or 0
                 
                 if (TimeMiliseconds >= 100). set TimeString += ".{TimeMiliseconds}"
                 else if (TimeMiliseconds >= 10). set TimeString += ".0{TimeMiliseconds}"

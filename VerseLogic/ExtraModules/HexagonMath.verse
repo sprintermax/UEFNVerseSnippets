@@ -1,6 +1,6 @@
-using { /UnrealEngine.com/Temporary/SpatialMath }
+using. /UnrealEngine.com/Temporary/SpatialMath
 
-using { MathFeatures }
+using. MathFeatures
 
 HexagonMath<public> := module {
 

@@ -1,5 +1,5 @@
-using { /UnrealEngine.com/Temporary/UI }
-using { /Verse.org/Simulation }
+using. /UnrealEngine.com/Temporary/UI
+using. /Verse.org/Simulation
 
 Wrappers<public> := module {
 

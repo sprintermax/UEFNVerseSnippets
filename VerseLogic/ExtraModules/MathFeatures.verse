@@ -1,7 +1,7 @@
-using { /UnrealEngine.com/Temporary/SpatialMath }
-using { /Verse.org/Random }
+using. /UnrealEngine.com/Temporary/SpatialMath
+using. /Verse.org/Random
 
-using { UnrealEngineFeatures }
+using. UnrealEngineFeatures
 
 MathFeatures<public> := module {
     operator'+'<public>(I:int, F:float)<transacts>:float = I * 1.0 + F
@@ -95,14 +95,9 @@ MathFeatures<public> := module {
         var<private> Seed<public> : int = -1
         Multiplier<public> : int = 1664525
         Increment<public> : int = 1013904223
-        var<private> Modulo<public> : int = 0
+        Modulo<public> : int = Constants.Max32BitInt
 
         Init(NewSeed:int)<transacts>: void = {
-            _32BitFloat := Pow(2.0, 32.0)
-            option {
-                _32BitInt := Floor[_32BitFloat]
-                set Modulo = _32BitInt
-            }
             set Seed = NewSeed
         }
 
@@ -148,18 +143,20 @@ MathFeatures<public> := module {
     }
 
     <#
-        Broken, the functions are supposed to allow up to 32bit ints and 64bit floats, but it doesn't support
-        even smaller ranges like from 16bit, completely breaking the result value by repeating the previous number
-        or behaving completely weird with positive/negative numbers
+        Seems to be broken, the verse functions and creative devices are supposed to allow up to 32bit ints and 64bit floats, but
+        it doesn't seem to support some ranges, completely breaking the result value by repeating the previous number or behaving
+        completely weird with positive/negative signs and decimals. I avoid going over 32bit ints and floats values due to this.
     #>
-    # Constants<public> := module {
-    #     Min32BitInt<public> : int = -2147483648
-    #     Max32BitInt<public> : int = 2147483647
-    #     Min64BitInt<public> : int = -9223372036854775808
-    #     Max64BitInt<public> : int = 9223372036854775807
-    # }
-    # GetRandomInt<public>() : int = GetRandomInt(Constants.Min32BitInt, Constants.Max32BitInt)
-    # GetRandomFloat<public>() : float = GetRandomFloat(Constants.Min32BitInt * 1.0, Constants.Max32BitInt * 1.0)
+    Constants<public> := module {
+        Min32BitInt<public> : int = -2147483648 # Round[Pow(-2.0, 31.0)] or Err("Unreachable")
+        Max32BitInt<public> : int = 2147483647 # Round[Pow(2.0, 31.0)] - 1 or Err("Unreachable")
+        Min64BitInt<public> : int = -9223372036854775808 # Round[Pow(-2.0, 63.0)] or Err("Unreachable")
+        Max64BitInt<public> : int = 9223372036854775807 # Round[Pow(2.0, 63.0)] - 1 or Err("Unreachable")
+        # Min64BitFloat<public>()<transacts> : float = Pow(2.0, -1022.0)
+        # Max64BitFloat<public>()<transacts> : float = (1.0 + (Pow(2.0, 52.0) - 1.0) / Pow(2.0, 52.0)) * Pow(2.0, 1023.0)
+    }
+    GetRandomInt<public>() : int = GetRandomInt(Constants.Min32BitInt, Constants.Max32BitInt)
+    GetRandomFloat<public>() : float = GetRandomFloat(Constants.Min32BitInt * 1.0, Constants.Max32BitInt * 1.0)
 
     EasingFunctions<public> := module {
 

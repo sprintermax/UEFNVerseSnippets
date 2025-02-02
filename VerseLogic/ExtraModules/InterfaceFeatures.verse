@@ -1,6 +1,6 @@
-using { /UnrealEngine.com/Temporary/SpatialMath }
-using { /UnrealEngine.com/Temporary/UI }
-using { /Verse.org/Colors }
+using. /UnrealEngine.com/Temporary/SpatialMath
+using. /UnrealEngine.com/Temporary/UI
+using. /Verse.org/Colors
 
 InterfaceFeatures<public> := module {
 
