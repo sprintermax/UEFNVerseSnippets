@@ -91,7 +91,7 @@ VerseFeatures<public> := module {
             CurrentValue = Value
         ). CurrentKey
 
-        KeysFound.Length <> 0 or not Strict?
+        KeysFound.Length > 0 or not Strict?
 
         KeysFound
     }
@@ -106,7 +106,7 @@ VerseFeatures<public> := module {
             CurrentValue = ValueToCompare
         ). set TempMap[CurrentKey] = CurrentValue
 
-        TempMap.Length <> 0 or not Strict?
+        TempMap.Length > 0 or not Strict?
 
         TempMap
     }
@@ -131,7 +131,7 @@ VerseFeatures<public> := module {
             Condition[CurrentValue]
         ). CurrentKey
         
-        <#KeysFound.Length <> 0 or not Strict?#>
+        <#KeysFound.Length > 0 or not Strict?#>
 
         KeysFound
     }
@@ -302,38 +302,16 @@ VerseFeatures<public> := module {
     # Tries to convert a numeric string to integer
     # Fails if the string is empty or not a valid integer number
     StringToInt<public>(String:string)<transacts><decides>:int = {
-        Length := String.Length
-        Length <> 0
-        
-        var IntegerNumber:int = 0
-
-        ReversedString := String.Reverse()
-
-        IsNegative := if (String[0] = '-') { true } else { false }
-
-        for (Index->Char : ReversedString) {
-            if (Index <> Length - 1 or not IsNegative?) {
-                CurrentDigit := CharToIntMap[Char]
-                set IntegerNumber += CurrentDigit * Int[Pow(10.0, Index * 1.0)]
-            }
-        }
-
-        if (IsNegative?). IntegerNumber * -1 else. IntegerNumber
-    }
-
-    # WIP - Untested - new version without reverse
-    StringToIntNew<public>(String:string)<transacts><decides>:int = {
-        Length := String.Length
-        Length <> 0
+        String.Length > 0
         
         var IntegerNumber:int = 0
 
         IsNegative := if (String[0] = '-') { true } else { false }
 
         for (Index->Char : String) {
-            if (Index <> Length - 1 or not IsNegative?) {
+            if (Index > 0 or not IsNegative?) {
                 CurrentDigit := CharToIntMap[Char]
-                set IntegerNumber += IntegerNumber * 10 + CurrentDigit
+                set IntegerNumber = IntegerNumber * 10 + CurrentDigit
             }
         }
 
@@ -345,8 +323,7 @@ VerseFeatures<public> := module {
     # Fails if the string is empty or not a valid float number
     # If Strict is set to true, will force a fail if the resulting value is Inf or NaN
     StringToFloat<public>(String:string, ?Strict:logic=false)<transacts><decides>:float = {
-        Length := String.Length
-        Length <> 0
+        String.Length > 0
 
         var FloatNumber:float = 0.0
         var IsFractionPart:logic = false
@@ -362,7 +339,7 @@ VerseFeatures<public> := module {
             set FloatNumber = NaN
         } else {
             for (Index->Char : String) {
-                if (Index <> Length - 1 or not IsNegative?) {
+                if (Index > 0 or not IsNegative?) {
                     if (Char = '.') {
                         set IsFractionPart = true
                     } else {
@@ -373,7 +350,7 @@ VerseFeatures<public> := module {
                             set FractionDivider *= 10.0
                             set FloatNumber += CurrentDigit * 1.0 / FractionDivider
                         } else {
-                            set FloatNumber += FloatNumber * 10.0 + CurrentDigit * 1.0
+                            set FloatNumber = FloatNumber * 10.0 + CurrentDigit * 1.0
                         }
                     }
                 }

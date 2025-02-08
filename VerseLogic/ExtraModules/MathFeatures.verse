@@ -83,10 +83,12 @@ MathFeatures<public> := module {
     (InputArray:[]t).Shuffle<public>(Seed:int where t:type)<transacts>:[]t = {
         var ShuffledArray : []t = InputArray
         var _Seed : int = Seed
-        
-        for (X := 0..ShuffledArray.Length - 1) {
 
-            I := ShuffledArray.Length - X
+        Length := ShuffledArray.Length
+        
+        for (X := 0..Length - 1) {
+
+            I := Length - X
             J := Floor[SeedRandom(_Seed) * (I + 1)] or I
 
             option{
