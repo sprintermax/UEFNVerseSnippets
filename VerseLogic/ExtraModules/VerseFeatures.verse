@@ -1,3 +1,4 @@
+using. /UnrealEngine.com/Temporary
 using. /UnrealEngine.com/Temporary/UI
 
 VerseFeatures<public> := module {
@@ -6,17 +7,6 @@ VerseFeatures<public> := module {
 
     Success<public>()<computes><decides>:void = true?
     Failure<public>()<computes><decides>:void = false?
-
-    PrintAndFail<public>(Message:string)<transacts><decides>:void = {
-        Print(Message)
-        Failure[]
-    }
-
-    PrintAndFail<public>(Message:string, Value:t where t :subtype(any))<transacts><decides>:t = {
-        Print(Message)
-        Failure[]
-        Err("Unreachable")
-    }
 
     (VerseFeatures:)ToString<public>(Input:logic)<computes>:string = {
         if (Input?) { "true" } else { "false" }
@@ -50,7 +40,7 @@ VerseFeatures<public> := module {
 
     # Returns a map without the map element that Key matches the Key provided
     # If Strict is set to true, will force a fail when key does not exist on the map
-    (Input:[k]v where k:subtype(comparable), v:type).RemoveByKey<public>(KeyToRemove: k, ?Strict:logic=false)<transacts><decides>:[k]v = {
+    (Input:[k]v).RemoveByKey<public>(KeyToRemove:k, (?Strict:logic=false) where k:subtype(comparable), v:type)<transacts><decides>:[k]v = {
         if (Strict?). Input[KeyToRemove]
 
         var TempMap:[k]v = map{}
@@ -62,7 +52,7 @@ VerseFeatures<public> := module {
     }
 
     # Returns a map without all map elements that Key matches the Keys provided
-    (Input:[k]v where k:subtype(comparable), v:type).RemoveByKeys<public>(KeysToRemove: []k)<transacts><decides>:[k]v = {
+    (Input:[k]v).RemoveByKeys<public>(KeysToRemove:[]k where k:subtype(comparable), v:type)<transacts><decides>:[k]v = {
         var TempMap:[k]v = Input
         for (KeyToRemove : KeysToRemove) {
             ResultMap := TempMap.RemoveByKey[KeyToRemove, ?Strict := false] # Strict default value is already false on the function definition and due to that is not a required argument, but if not mentioned again here, for some reason it crashes the server
@@ -72,7 +62,7 @@ VerseFeatures<public> := module {
     }
 
     # Returns a map with only the elements that Key matches the Keys provided
-    (Input:[k]v where k:subtype(comparable), v:type).FilterByKeys<public>(Keys: []k)<transacts><decides>:[k]v = {
+    (Input:[k]v).FilterByKeys<public>(Keys:[]k where k:subtype(comparable), v:type)<transacts><decides>:[k]v = {
         var TempMap:[k]v = map{}
         for (
             CurrentKey->CurrentValue:Input
@@ -83,7 +73,7 @@ VerseFeatures<public> := module {
     }
 
     # Returns the first map Key where the associated Value matches the provided Value
-    (Input:[k]v where k:subtype(comparable), v:subtype(comparable)).FindKeyByValue<public>(Value: v)<transacts><decides>:k = {
+    (Input:[k]v).FindKeyByValue<public>(Value:v where k:subtype(comparable), v:subtype(comparable))<transacts><decides>:k = {
         var MaybeKey:?k = false
         for (
             CurrentKey->CurrentValue:Input
@@ -95,12 +85,11 @@ VerseFeatures<public> := module {
 
     # Returns all map Keys where the associated Value matches the provided Value
     # If Strict is set to true, will force a fail when none of the values exist on the map
-    (Input:[k]v where k:subtype(comparable), v:subtype(comparable)).FindKeysByValue<public>(Value: v, ?Strict:logic=false)<transacts><decides>:[]k = {
-        var KeysFound:[]k = array{}
-        for (
+    (Input:[k]v).FindKeysByValue<public>(Value:v, (?Strict:logic=false) where k:subtype(comparable), v:subtype(comparable))<transacts><decides>:[]k = {
+        KeysFound := for (
             CurrentKey->CurrentValue:Input
             CurrentValue = Value
-        ). set KeysFound += array{CurrentKey}
+        ). CurrentKey
 
         KeysFound.Length <> 0 or not Strict?
 
@@ -109,9 +98,9 @@ VerseFeatures<public> := module {
 
     # return a map with only the elements that Value matches the Values provided
     # If Strict is set to true, will force a fail when none of the values exist on the map
-    (Input:[k]v where k:subtype(comparable), v:subtype(comparable)).FilterByValues<public>(Values: []v, ?Strict:logic=false)<transacts><decides>:[k]v = {
+    (Input:[k]v).FilterByValues<public>(Values:[]v, (?Strict:logic=false) where k:subtype(comparable), v:subtype(comparable))<transacts><decides>:[k]v = {
         var TempMap:[k]v = map{}
-        for (
+        NewMap := for (
             CurrentKey->CurrentValue:Input
             ValueToCompare : Values
             CurrentValue = ValueToCompare
@@ -122,8 +111,9 @@ VerseFeatures<public> := module {
         TempMap
     }
 
+    # UNTESTED
     # Returns the first map Key where the Value succeeds the provided condition function
-    (Input:[k]v where k:subtype(comparable), v:subtype(any)).FindKeyByValueData<public>(Condition:type{_(:v)<transacts><decides>:void})<transacts><decides>:k = {
+    (Input:[k]v).FindKeyByValueData<public>(Condition:type{_(:v)<transacts><decides>:void} where k:subtype(comparable), v:subtype(any))<transacts><decides>:k = {
         var MaybeKey:?k = false
         for (
             CurrentKey->CurrentValue:Input
@@ -135,12 +125,11 @@ VerseFeatures<public> := module {
 
     # Returns all map Keys where the Value succeeds the provided condition function
     # If Strict is set to true, will force a fail when no compatible values exist on the map
-    (Input:[k]v where k:subtype(comparable), v:subtype(any)).FindKeysByValueData<public>(Condition:type{_(:v)<transacts><decides>:void}<#, ?Strict:logic=false#>)<transacts><decides>:[]k = {
-        var KeysFound:[]k = array{}
-        for (
+    (Input:[k]v).FindKeysByValueData<public>(Condition:type{_(:v)<transacts><decides>:void}<#, (?Strict:logic=false)#> where k:subtype(comparable), v:subtype(any))<transacts><decides>:[]k = {
+        KeysFound := for (
             CurrentKey->CurrentValue:Input
             Condition[CurrentValue]
-        ). set KeysFound += array{CurrentKey}
+        ). CurrentKey
         
         <#KeysFound.Length <> 0 or not Strict?#>
 
@@ -159,17 +148,17 @@ VerseFeatures<public> := module {
         ). Element
     }
 
-    (Input:[]t where t:type).At<public>(Index:int)<decides><computes>: t = {
-        Length := Input.Length
-
+    NormalizeIndex<public>(Length:int, Index:int)<decides><computes>:int = {
         Length >= 1
 
         NormalizedRange := Mod[Index, Length]
 
         NormalizedIndex := if (NormalizedRange < 0). Length + NormalizedRange
         else. NormalizedRange
+    }
 
-        Input[NormalizedIndex]
+    (Input:[]t where t:type).At<public>(Index:int)<decides><computes>:t = {
+        Input[NormalizeIndex[Input.Length, Index]]
     }
 
     (Input:generator(t) where t:type).AsArray<public>()<computes>:[]t = {
@@ -180,7 +169,7 @@ VerseFeatures<public> := module {
 
     ### Sorting Operations
 
-    (Input:[]t where t:type).MergeSort<public>(Less : type{_(:t, :t)<decides><transacts>:void})<transacts> : []t = {
+    (Input:[]t where t:type).MergeSort<public>(Less:type{_(:t, :t)<decides><transacts>:void})<transacts>:[]t = {
         Length := Input.Length
 
         if (
@@ -225,25 +214,25 @@ VerseFeatures<public> := module {
         } else { Input }
     }
 
-    SortIntAscending<public>(Left:int, Right:int)<decides><transacts>:void = {
+    SortIntAscending<public>(Left:int, Right:int)<decides><computes>:void = {
         Left < Right
     }
 
-    SortIntDescending<public>(Left:int, Right:int)<decides><transacts>:void = {
+    SortIntDescending<public>(Left:int, Right:int)<decides><computes>:void = {
         Left > Right
     }
 
-    SortFloatAscending<public>(Left:float, Right:float)<decides><transacts>:void = {
+    SortFloatAscending<public>(Left:float, Right:float)<decides><computes>:void = {
         Left < Right
     }
 
-    SortFloatDescending<public>(Left:float, Right:float)<decides><transacts>:void = {
+    SortFloatDescending<public>(Left:float, Right:float)<decides><computes>:void = {
         Left > Right
     }
 
 
     # OBSOLETE NEEDS REWORK
-    # (Input:[]t where t:type).Sort<public>(Comparer : type{_(:t, :t)<computes> : int}, ?IsAscending : logic = true)<computes> : []t = {
+    # (Input:[]t where t:type).Sort<public>(Comparer:type{_(:t, :t)<computes>:int}, ?IsAscending:logic = true)<computes>:[]t = {
     #     if (Input.Length > 1, Pivot := Input[Floor(Input.Length/2)]) {
             
     #         Left := for (Element : Input, Comparer(Element, Pivot) < 0) { Element }
@@ -256,13 +245,13 @@ VerseFeatures<public> := module {
     #     } else { Input }
     # }
 
-    # SortIntDefaultComparer<public>(A:int, B:int)<computes> : int = {
+    # SortIntDefaultComparer<public>(A:int, B:int)<computes>:int = {
     #     if (A < B). -1
     #     else if (A > B). 1
     #     else 0
     # }
 
-    # SortFloatDefaultComparer<public>(A:float, B:float)<computes> : int = {
+    # SortFloatDefaultComparer<public>(A:float, B:float)<computes>:int = {
     #     if (A < B). -1
     #     else if (A > B). 1
     #     else 0
@@ -272,23 +261,35 @@ VerseFeatures<public> := module {
 
     ### Containers
 
-    Stack<public>(t:type) := class<computes> {
+    # Generic container class that can be used for FIFO, LIFO, and other common types of array data storage
+    Container<public>(t:type) := class<computes> {
         Elements<public> :[]t = array{}
 		
         Size<public>()<computes>:int = Elements.Length
         IsEmpty<public>()<decides><computes>:void = Elements.Length = 0
 
-        AddFirst<public>(Element:t)<computes>:Stack(t) = Stack(t){ Elements := array{Element} + Elements }
-        AddLast<public>(Element:t)<computes>:Stack(t) = Stack(t){ Elements := Elements + array{Element} }
+        AddFirst<public>(Element:t)<computes>:Container(t) = Container(t){ Elements := array{Element} + Elements }
+        AddLast<public>(Element:t)<computes>:Container(t) = Container(t){ Elements := Elements + array{Element} }
 
-        GetAt<public>(Index:int)<decides><computes>:tuple(Stack(t), t) = (Stack(t){ Elements := Elements.RemoveElement[Index] }, Elements[Index])
+        # Get the value at an specific index
+        # Fails if not able to find a value on the provided index
+        # If Strict is set to False (Default), out of bound indexes will be normalized to array bounds
+        # If Strict is set to true, out of bound indexes will not be normalized and will cause a fail
+        GetAt<public>(Index:int, ?Strict:logic=false)<decides><computes>:tuple(Container(t), t) = {
+            TargetIndex := if (Strict?). Index else. NormalizeIndex[Elements.Length, Index]
+            (Container(t){ Elements := Elements.RemoveElement[TargetIndex] }, Elements[TargetIndex])
+        }
 
-        GetFirst<public>()<decides><computes>:tuple(Stack(t), t) = (Stack(t){ Elements := Elements.RemoveElement[0] }, Elements[0])
-        GetLast<public>()<decides><computes>:tuple(Stack(t), t) = (Stack(t){ Elements := Elements.RemoveElement[Elements.Length - 1] }, Elements[Elements.Length - 1])
+        GetFirst<public>()<decides><computes>:tuple(Container(t), t) = (Container(t){ Elements := Elements.RemoveElement[0] }, Elements[0])
+        GetLast<public>()<decides><computes>:tuple(Container(t), t) = (Container(t){ Elements := Elements.RemoveElement[Elements.Length - 1] }, Elements[Elements.Length - 1])
+
+        (local:)SortBy<public>(Less:type {_(:t, :t)<computes><decides>:void})<computes>:Container(t) = {
+            Container(t){ Elements := SortBy(Elements, Less) }
+        }
 
         # Aliases
-        Push<public>(Element:t)<computes>:Stack(t) = AddLast(Element)
-        Pop<public>()<computes><decides>:tuple(Stack(t), t) = GetLast[]
+        Push<public>(Element:t)<computes>:Container(t) = AddLast(Element)
+        Pop<public>()<computes><decides>:tuple(Container(t), t) = GetLast[]
     }
 
     ### String Utils
@@ -298,6 +299,8 @@ VerseFeatures<public> := module {
         '5' => 5, '6' => 6, '7' => 7, '8' => 8, '9' => 9
     }
 
+    # Tries to convert a numeric string to integer
+    # Fails if the string is empty or not a valid integer number
     StringToInt<public>(String:string)<transacts><decides>:int = {
         Length := String.Length
         Length <> 0
@@ -316,5 +319,67 @@ VerseFeatures<public> := module {
         }
 
         if (IsNegative?). IntegerNumber * -1 else. IntegerNumber
+    }
+
+    # WIP - Untested - new version without reverse
+    StringToIntNew<public>(String:string)<transacts><decides>:int = {
+        Length := String.Length
+        Length <> 0
+        
+        var IntegerNumber:int = 0
+
+        IsNegative := if (String[0] = '-') { true } else { false }
+
+        for (Index->Char : String) {
+            if (Index <> Length - 1 or not IsNegative?) {
+                CurrentDigit := CharToIntMap[Char]
+                set IntegerNumber += IntegerNumber * 10 + CurrentDigit
+            }
+        }
+
+        if (IsNegative?). IntegerNumber * -1 else. IntegerNumber
+    }
+
+    # WIP - Untested
+    # Tries to convert a numeric string to float (Including Inf and NaN values)
+    # Fails if the string is empty or not a valid float number
+    # If Strict is set to true, will force a fail if the resulting value is Inf or NaN
+    StringToFloat<public>(String:string, ?Strict:logic=false)<transacts><decides>:float = {
+        Length := String.Length
+        Length <> 0
+
+        var FloatNumber:float = 0.0
+        var IsFractionPart:logic = false
+        var FractionDivider:float = 1.0
+
+        IsNegative := if (String[0] = '-') { true } else { false }
+
+        if (String = "-Inf" or String = "Inf") {
+            not Strict?
+            set FloatNumber = Inf
+        } else if (String = "NaN") {
+            not Strict?
+            set FloatNumber = NaN
+        } else {
+            for (Index->Char : String) {
+                if (Index <> Length - 1 or not IsNegative?) {
+                    if (Char = '.') {
+                        set IsFractionPart = true
+                    } else {
+
+                        CurrentDigit := CharToIntMap[Char]
+
+                        if (IsFractionPart?) {
+                            set FractionDivider *= 10.0
+                            set FloatNumber += CurrentDigit * 1.0 / FractionDivider
+                        } else {
+                            set FloatNumber += FloatNumber * 10.0 + CurrentDigit * 1.0
+                        }
+                    }
+                }
+            }
+        }
+
+        if (IsNegative?). FloatNumber * -1.0 else. FloatNumber
     }
 }

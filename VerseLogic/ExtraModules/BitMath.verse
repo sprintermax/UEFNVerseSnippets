@@ -2,11 +2,11 @@ using. MathFeatures
 
 BitMath<public> := module {
 
-    BitwiseAndCondition<internal>(A:int, B:int)<transacts><decides>:void = A = 1 and B = 1
-    BitwiseOrCondition<internal>(A:int, B:int)<transacts><decides>:void = A = 1 or B = 1
-    BitwiseXorCondition<internal>(A:int, B:int)<transacts><decides>:void = Mod[A + B, 2] = 1
+    BitwiseAndCondition<internal>(A:int, B:int)<computes><decides>:void = A = 1 and B = 1
+    BitwiseOrCondition<internal>(A:int, B:int)<computes><decides>:void = A = 1 or B = 1
+    BitwiseXorCondition<internal>(A:int, B:int)<computes><decides>:void = Mod[A + B, 2] = 1
 
-    BitwiseBaseHandler<internal>(InputA:int, InputB:int, BitwiseCondition:type{_(:int, :int)<transacts><decides>:void})<transacts>:int = {
+    BitwiseBaseHandler<internal>(InputA:int, InputB:int, BitwiseCondition:type{_(:int, :int)<computes><decides>:void})<transacts>:int = {
 
         MaxInt := Round[Pow(2.0, 32.0)] or Err("Unreachable")
 
@@ -47,7 +47,7 @@ BitMath<public> := module {
         BitwiseBaseHandler(InputA, InputB, BitwiseXorCondition)
     }
 
-    BitwiseNot<public>(InputX:int)<transacts>:int = {
+    BitwiseNot<public>(InputX:int)<computes><reads>:int = {
 
         MaxInt := Round[Pow(2.0, 32.0)] or Err("Unreachable")
 
@@ -60,16 +60,16 @@ BitMath<public> := module {
         if (Result * 1.0 >= MaxInt / 2.0). Result - MaxInt else Result
     }
 
-    LeftShift<public>(Input:int, Positions:int)<transacts>:int = { # <<
+    LeftShift<public>(Input:int, Positions:int)<computes><reads>:int = { # <<
         Input * Round[Pow(2.0, Abs(Positions) * 1.0)] or Err("Unreachable")
     }
 
     # Arithmetic
-    RightShift<public>(Input:int, Positions:int)<transacts>:int = { # >>
+    RightShift<public>(Input:int, Positions:int)<computes><reads>:int = { # >>
         Floor(Input / Round[Pow(2.0, Abs(Positions) * 1.0)]) or Err("Unreachable")
     }
 
-    LogicalRightShift<public>(InputX:int, Positions:int)<transacts>:int = { # >>>
+    LogicalRightShift<public>(InputX:int, Positions:int)<computes><reads>:int = { # >>>
 
         # Handles negative numbers
         X := if (InputX < 0). Floor[InputX + Pow(2.0, 32.0)] or Err("Unreachable") else InputX

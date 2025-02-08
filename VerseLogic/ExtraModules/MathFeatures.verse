@@ -4,56 +4,66 @@ using. /Verse.org/Random
 using. UnrealEngineFeatures
 
 MathFeatures<public> := module {
-    operator'+'<public>(I:int, F:float)<transacts>:float = I * 1.0 + F
-    operator'+'<public>(F:float, I:int)<transacts>:float = F + I * 1.0
-    operator'-'<public>(I:int, F:float)<transacts>:float = I * 1.0 - F
-    operator'-'<public>(F:float, I:int)<transacts>:float = F - I * 1.0
-    operator'/'<public>(I:int, F:float)<transacts>:float = I * 1.0 / F
-    operator'/'<public>(F:float, I:int)<transacts>:float = F / (I * 1.0)
+    operator'+'<public>(I:int, F:float)<computes>:float = I * 1.0 + F
+    operator'+'<public>(F:float, I:int)<computes>:float = F + I * 1.0
+    operator'-'<public>(I:int, F:float)<computes>:float = I * 1.0 - F
+    operator'-'<public>(F:float, I:int)<computes>:float = F - I * 1.0
+    operator'/'<public>(I:int, F:float)<computes>:float = I * 1.0 / F
+    operator'/'<public>(F:float, I:int)<computes>:float = F / (I * 1.0)
 
     # Disabled because compiler shows as reserved identifiers
-    # operator'>'<public>(I:int, F:float)<transacts><decides>:int = I > F
-    # operator'>'<public>(F:float, I:int)<transacts><decides>:float = F > I
-    # operator'<'<public>(I:int, F:float)<transacts><decides>:int = I < F
-    # operator'<'<public>(F:float, I:int)<transacts><decides>:float = F < I
+    # operator'>'<public>(I:int, F:float)<computes><decides>:int = I > F
+    # operator'>'<public>(F:float, I:int)<computes><decides>:float = F > I
+    # operator'<'<public>(I:int, F:float)<computes><decides>:int = I < F
+    # operator'<'<public>(F:float, I:int)<computes><decides>:float = F < I
 
-    # operator'<>'<public>(I:int, F:float)<transacts><decides>:int = { I * 1.0 <> F; I }
-    # operator'<>'<public>(F:float, I:int)<transacts><decides>:float = { F <> I * 1.0 }
+    # operator'>='<public>(I:int, F:float)<computes><decides>:int = I >= F
+    # operator'>='<public>(F:float, I:int)<computes><decides>:float = F >= I
+    # operator'<='<public>(I:int, F:float)<computes><decides>:int = I <= F
+    # operator'<='<public>(F:float, I:int)<computes><decides>:float = F <= I
 
-    # operator'='<public>(I:int, F:float)<transacts><decides>:int = { I * 1.0 = F; I }
-    # operator'='<public>(F:float, I:int)<transacts><decides>:float = { F = I * 1.0 }
+    # operator'>='<public>(I:int, F:float)<computes><decides>:int = I >= F
+    # operator'>='<public>(F:float, I:int)<computes><decides>:float = F >= I
+    # operator'<='<public>(I:int, F:float)<computes><decides>:int = I <= F
+    # operator'<='<public>(F:float, I:int)<computes><decides>:float = F <= I
+
+    # operator'<>'<public>(I:int, F:float)<computes><decides>:int = { I * 1.0 <> F; I }
+    # operator'<>'<public>(F:float, I:int)<computes><decides>:float = { F <> I * 1.0 }
+
+    # operator'='<public>(I:int, F:float)<computes><decides>:int = { I * 1.0 = F; I }
+    # operator'='<public>(F:float, I:int)<computes><decides>:float = { F = I * 1.0 }
 
     zero_to_one_float<public> := type{_X:float where 0.0 <= _X, _X <= 1.0}
 
-    RemapValueRange<public>(FromLow:float, FromHigh:float, ToLow:float, ToHigh:float, Value:float)<transacts>:float = {
+    RemapValueRange<public>(FromLow:float, FromHigh:float, ToLow:float, ToHigh:float, Value:float)<computes>:float = {
         return ToLow + (Value - FromLow) * (ToHigh - ToLow) / (FromHigh - FromLow)
     }
 
-    (Value:int).ToFloat<public>()<transacts>:float = Value * 1.0
+    (Value:int).ToFloat<public>()<computes>:float = Value * 1.0
 
-    RoundDecimals<public>(Input:float, Decimals:int)<transacts><decides>:float = {
+    RoundDecimals<public>(Input:float, Decimals:int)<computes><decides><reads>:float = {
         Factor := Pow(10.0, Decimals * 1.0)
         
         Rounded := Round[Input * Factor]
         return (Rounded * 1.0) / Factor
     }
 
-    FloorDecimals<public>(Input:float, Decimals:int)<transacts><decides>:float = {
+    FloorDecimals<public>(Input:float, Decimals:int)<computes><decides><reads>:float = {
         Factor := Pow(10.0, Decimals * 1.0)
 
         Rounded := Floor[Input * Factor]
         return (Rounded * 1.0) / Factor
     }
 
-    CeilDecimals<public>(Input:float, Decimals:int)<transacts><decides>: float = {
+    CeilDecimals<public>(Input:float, Decimals:int)<computes><decides><reads>:float = {
         Factor := Pow(10.0, Decimals * 1.0)
         
         Rounded := Ceil[Input * Factor]
         return (Rounded * 1.0) / Factor
     }
 
-    TruncateFloatToString<public>(Input:float, Decimals:int)<transacts><decides>:[]char = {
-        var String:[]char = ToString(Input)
+    TruncateFloatToString<public>(Input:float, Decimals:int)<computes><decides><reads>:[]char = {
+        String := ToString(Input)
 
         DotIndex := String.Find['.']
         StopIndex := if (Decimals > 0) { Min(DotIndex+Decimals+1,String.Length) } else { DotIndex }
@@ -63,12 +73,14 @@ MathFeatures<public> := module {
 
     ### RNGs
 
-    SeedRandom<public>(Seed:int)<transacts>:float = {
+    # Simple deterministic RNG, return between 0.0 (inclusive) and 1.0 (exclusive)
+    SeedRandom<public>(Seed:int)<computes><reads>:float = {
         X := Sin(Seed * 1.0) * 10000.0
         X - Floor[X] * 1.0 or 0.0
     }
 
-    (InputArray:[]t).Shuffle<public>(Seed:int where t : type)<transacts>: []t = {
+    # Shuffle an array of elements using a seed to make it deterministic
+    (InputArray:[]t).Shuffle<public>(Seed:int where t:type)<transacts>:[]t = {
         var ShuffledArray : []t = InputArray
         var _Seed : int = Seed
         
@@ -91,51 +103,92 @@ MathFeatures<public> := module {
     }
 
     # Never needed to use this, should work but is untested
+    # A more complete RNG class with more useful features
     seedable_rng := class {
-        var<private> Seed<public> : int = -1
-        Multiplier<public> : int = 1664525
-        Increment<public> : int = 1013904223
-        Modulo<public> : int = Constants.Max32BitInt
+        var State<private> : int = -1
+        var<private> Iteration<public> : int = 0
+        Multiplier<private> : int = 1664525
+        Increment<private> : int = 1013904223
+        Modulo<private> : int = Constants.Max32BitInt
 
-        Init(NewSeed:int)<transacts>: void = {
-            set Seed = NewSeed
+        # Setup, Reset or Change the RNG state
+        Init<public>(Seed:int)<transacts>:void = {
+            set State = Seed
+            set Iteration = 0
         }
 
-        NextInt()<transacts> : int = {
-            option {
-                NewValue := Mod[Multiplier * Seed + Increment, Modulo]
-                set Seed = NewValue
+        # Jumps to the next state
+        NextState<public>()<transacts>:void = {
+            set State = Mod[Multiplier * State + Increment, Modulo] or Err("Unreachable")
+            set Iteration += 1
+        }
+
+        # Jumps the current state a specific amount of times
+        Jump<public>(Count:int)<transacts>:void = {
+            for (X := 0..Count - 1) {
+                NextState()
             }
-            Seed
         }
 
-        NextIntRange(ValueMin:int, ValueMax:int)<transacts> : int = {
-            ValueMin + (Mod[NextInt(), (ValueMax - ValueMin + 1)]) or 0
+        # Returns random float from 0.0 (inclusive) to 1.0 (exclusive)
+        NextFloat<public>()<transacts>:float = {
+            NextState()
+            State * 1.0 / Modulo
+        }
+
+        # Returns random float from ValueMin (inclusive) to ValueMax (exclusive)
+        NextFloatRange<public>(ValueMin:float, ValueMax:float)<transacts>:float = {
+            ValueMin + (NextFloat() * (ValueMax - ValueMin))
+        }
+
+        # Returns random int # WIP TEST
+        NextInt<public>()<transacts>:int = {
+            NextState()
+            State
+        }
+
+        # Returns random int from ValueMin (inclusive) to ValueMax (inclusive) # WIP TEST
+        NextIntRange<public>(ValueMin:int, ValueMax:int)<transacts>:int = {
+            ValueMin + Mod[NextInt(), (ValueMax - ValueMin + 1)] or 0
         }
     }
 
-    # Returns a random element by considering priority weight over others (Weight, ChoiceData)
-    # (Untested with Negative and Zero weight values)
-    GetRandomByWeights<public>(Choices:[]tuple(int, t) where t : type)<transacts><decides>:t = {
+    # Makes an array of possible choices that can be used on GetRandomByWeights[]
+    # Array of Elements and Weights are supposed to have the same length
+    # If Strict is set to false, will auto assign weight of 0 to exceding elements
+    # If Strict is set to true, will force a fail if array lengths don't match.
+    (Elements:[]t).AssignChoiceWeights<public>(Weights:[]int, (?Strict:logic = false) where t:type)<transacts><decides>:[]tuple(t, int) = {
+        Elements.Length = Weights.Length or not Strict?
+
+        Choices := for (
+            Index->Element : Elements
+            Weight := Weights[Index] or 0
+        ). (Element, Weight)
+    }
+
+    # Returns a random element by considering priority weight over others (ChoiceData, Weight)
+    # Elements with negative or weight of 0 will never be selected
+    GetRandomByWeights<public>(Choices:[]tuple(t, int) where t:type)<transacts><decides>:t = {
         var TotalWeight : int = 0
 
-        for (Choice : Choices). set TotalWeight += Choice(0)
+        for (Choice : Choices). set TotalWeight += Max(0, Choice(1))
 
         var AccumulatedWeight : int = 0
         var MaybeSelectedChoice : ?t = false
 
         for (ChoiceIndex->Choice : Shuffle(Choices), not MaybeSelectedChoice?) {
-            set AccumulatedWeight += Choice(0)
+            set AccumulatedWeight += Max(0, Choice(1))
             if (GetRandomInt(0, TotalWeight) < AccumulatedWeight) {
-                set MaybeSelectedChoice = option{Choice(1)}
+                set MaybeSelectedChoice = option{Choice(0)}
             }
         }
 
         MaybeSelectedChoice?
     }
 
-    # Returns (Current Index, Progress to Next Index)
-    GetIterationIndex<public>(TotalProgress:float, StepSize:float)<transacts>:tuple(int,float) = {
+    # Used to calculate how many times a cycle happened, and how much progress is left to the next cycle
+    # Returns (Current Cycle Index, Progress to Next Index)
+    GetIterationIndex<public>(TotalProgress:float, StepSize:float)<computes><reads>:tuple(int,float) = {
         IterationIndex := Floor[TotalProgress / StepSize] or 0
         StepProgress := TotalProgress - IterationIndex * StepSize
 
@@ -152,14 +205,23 @@ MathFeatures<public> := module {
         Max32BitInt<public> : int = 2147483647 # Round[Pow(2.0, 31.0)] - 1 or Err("Unreachable")
         Min64BitInt<public> : int = -9223372036854775808 # Round[Pow(-2.0, 63.0)] or Err("Unreachable")
         Max64BitInt<public> : int = 9223372036854775807 # Round[Pow(2.0, 63.0)] - 1 or Err("Unreachable")
-        # Min64BitFloat<public>()<transacts> : float = Pow(2.0, -1022.0)
-        # Max64BitFloat<public>()<transacts> : float = (1.0 + (Pow(2.0, 52.0) - 1.0) / Pow(2.0, 52.0)) * Pow(2.0, 1023.0)
+        # Min64BitFloat<public>()<transacts>float = Pow(2.0, -1022.0)
+        # Max64BitFloat<public>()<transacts>:float = (1.0 + (Pow(2.0, 52.0) - 1.0) / Pow(2.0, 52.0)) * Pow(2.0, 1023.0)
+        HalfPi<public>:float = PiFloat / 2.0
     }
-    GetRandomInt<public>() : int = GetRandomInt(Constants.Min32BitInt, Constants.Max32BitInt)
-    GetRandomFloat<public>() : float = GetRandomFloat(Constants.Min32BitInt * 1.0, Constants.Max32BitInt * 1.0)
+
+    # Get a random int between Min32BitInt and Max32BitInt
+    GetRandomInt<public>():int = GetRandomInt(Constants.Min32BitInt, Constants.Max32BitInt)
+
+    # Get a random float between Min32BitInt and Max32BitInt
+    # Verse has 64bit floats, but I avoid using that full range due to some issues explained above
+    GetRandomFloat<public>():float = GetRandomFloat(Constants.Min32BitInt * 1.0, Constants.Max32BitInt * 1.0)
 
     EasingFunctions<public> := module {
 
+        # Easing modes for interpolation of values
+        # https://easings.net/
+        # https://easingwizard.com/
         easing_mode<public> := enum {
             Linear
             InSine
@@ -194,7 +256,10 @@ MathFeatures<public> := module {
             InOutBounce
         }
 
-        (EasingMode:easing_mode).Evaluate<public>(Value:float):float = {
+        # All easing functions expect input values between 0.0 and 1.0
+        # Some functions may work with values outside that range, but it is not
+        # guaranteed, they may not work as expected and give weird results
+        (EasingMode:easing_mode).Evaluate<public>(Value:float)<computes><reads>:float = {
             case (EasingMode) {
                 easing_mode.Linear => Value
                 easing_mode.InSine => EaseInSine(Value)
@@ -230,23 +295,23 @@ MathFeatures<public> := module {
             }
         }
 
-        EaseInSine<public>(Value:float):float = {
+        EaseInSine<public>(Value:float)<computes><reads>:float = {
             1 - Cos((Value * PiFloat) / 2)
         }
-        EaseOutSine<public>(Value:float):float = {
+        EaseOutSine<public>(Value:float)<computes><reads>:float = {
             Sin((Value * PiFloat) / 2)
         }
-        EaseInOutSine<public>(Value:float):float = {
+        EaseInOutSine<public>(Value:float)<computes><reads>:float = {
             -(Cos(PiFloat * Value) - 1) / 2
         }
         
-        EaseInQuad<public>(Value:float):float = {
+        EaseInQuad<public>(Value:float)<computes>:float = {
             Value * Value
         }
-        EaseOutQuad<public>(Value:float):float = {
+        EaseOutQuad<public>(Value:float)<computes>:float = {
             1- (1 - Value) * (1 - Value)
         }
-        EaseInOutQuad<public>(Value:float):float = {
+        EaseInOutQuad<public>(Value:float)<computes><reads>:float = {
             if (Value < 0.5) {
                 2 * Value * Value
             } else {
@@ -254,13 +319,13 @@ MathFeatures<public> := module {
             }
         }
 
-        EaseInCubic<public>(Value:float):float = {
+        EaseInCubic<public>(Value:float)<computes>:float = {
             Value * Value * Value
         }
-        EaseOutCubic<public>(Value:float):float = {
+        EaseOutCubic<public>(Value:float)<computes><reads>:float = {
             1 - Pow(1 - Value, 3.0)
         }
-        EaseInOutCubic<public>(Value:float):float = {
+        EaseInOutCubic<public>(Value:float)<computes><reads>:float = {
             if (Value < 0.5) {
                 4 * Value * Value * Value
             } else {
@@ -268,13 +333,13 @@ MathFeatures<public> := module {
             }
         }
 
-        EaseInQuart<public>(Value:float):float = {
+        EaseInQuart<public>(Value:float)<computes>:float = {
             Value * Value * Value * Value
         }
-        EaseOutQuart<public>(Value:float):float = {
+        EaseOutQuart<public>(Value:float)<computes><reads>:float = {
             1 - Pow(1 - Value, 4.0)
         }
-        EaseInOutQuart<public>(Value:float):float = {
+        EaseInOutQuart<public>(Value:float)<computes><reads>:float = {
             if (Value < 0.5) {
                 8 * Value * Value * Value * Value
             } else {
@@ -282,13 +347,13 @@ MathFeatures<public> := module {
             }
         }
 
-        EaseInQuint<public>(Value:float):float = {
+        EaseInQuint<public>(Value:float)<computes>:float = {
             Value * Value * Value * Value * Value
         }
-        EaseOutQuint<public>(Value:float):float = {
+        EaseOutQuint<public>(Value:float)<computes><reads>:float = {
             1 - Pow(1 - Value, 5.0)
         }
-        EaseInOutQuint<public>(Value:float):float = {
+        EaseInOutQuint<public>(Value:float)<computes><reads>:float = {
             if (Value < 0.5) {
                 16 * Value * Value * Value * Value * Value
             } else {
@@ -296,21 +361,21 @@ MathFeatures<public> := module {
             }
         }
 
-        EaseInExpo<public>(Value:float):float = {
+        EaseInExpo<public>(Value:float)<computes><reads>:float = {
             if (Value = 0.0) {
                 0.0
             } else {
                 Pow(2.0, 10 * Value - 10)
             }
         }
-        EaseOutExpo<public>(Value:float):float = {
+        EaseOutExpo<public>(Value:float)<computes><reads>:float = {
             if (Value = 1.0) {
                 1.0
             } else {
                 1 - Pow(2.0, -10 * Value)
             }
         }
-        EaseInOutExpo<public>(Value:float):float = {
+        EaseInOutExpo<public>(Value:float)<computes><reads>:float = {
             if (Value = 0.0) {
                 0.0
             } else if (Value = 1.0) {
@@ -322,13 +387,13 @@ MathFeatures<public> := module {
             }
         }
 
-        EaseInCirc<public>(Value:float):float = {
+        EaseInCirc<public>(Value:float)<computes><reads>:float = {
             1 - Sqrt(1 - Pow(Value, 2.0))
         }
-        EaseOutCirc<public>(Value:float):float = {
+        EaseOutCirc<public>(Value:float)<computes><reads>:float = {
             Sqrt(1 - Pow(Value - 1, 2.0))
         }
-        EaseInOutCirc<public>(Value:float):float = {
+        EaseInOutCirc<public>(Value:float)<computes><reads>:float = {
             if (Value < 0.5) {
                 (1 - Sqrt(1 - Pow(2 * Value, 2.0))) / 2
             } else {
@@ -336,19 +401,19 @@ MathFeatures<public> := module {
             }
         }
 
-        EaseInBack<public>(Value:float):float = {
+        EaseInBack<public>(Value:float)<computes>:float = {
             Constant := 1.70158
             Constant2 := Constant + 1
 
             Constant2 * Value * Value * Value - Constant * Value * Value
         }
-        EaseOutBack<public>(Value:float):float = {
+        EaseOutBack<public>(Value:float)<computes><reads>:float = {
             Constant := 1.70158
             Constant2 := Constant + 1
 
             1 + Constant2 * Pow(Value -1, 3.0) + Constant * Pow(Value - 1, 2.0)
         }
-        EaseInOutBack<public>(Value:float):float = {
+        EaseInOutBack<public>(Value:float)<computes><reads>:float = {
             Constant := 1.70158
             Constant2 := Constant + 1.525
 
@@ -359,7 +424,7 @@ MathFeatures<public> := module {
             }
         }
         
-        EaseInElastic<public>(Value:float):float = {
+        EaseInElastic<public>(Value:float)<computes><reads>:float = {
             Constant := (2 * PiFloat) / 3
 
             if (Value = 0.0) {
@@ -370,7 +435,7 @@ MathFeatures<public> := module {
                 -Pow(2.0, 10 * Value - 10) * Sin((Value * 10 - 10.75) * Constant)
             }
         }
-        EaseOutElastic<public>(Value:float):float = {
+        EaseOutElastic<public>(Value:float)<computes><reads>:float = {
             Constant := (2 * PiFloat) / 3
 
             if (Value = 0.0) {
@@ -381,7 +446,7 @@ MathFeatures<public> := module {
                 Pow(2.0, -10 * Value) * Sin((Value * 10 - 0.75) * Constant) + 1
             }
         }
-        EaseInOutElastic<public>(Value:float):float = {
+        EaseInOutElastic<public>(Value:float)<computes><reads>:float = {
             Constant := (2 * PiFloat) / 4.5
 
             if (Value = 0.0) {
@@ -395,10 +460,10 @@ MathFeatures<public> := module {
             }
         }
         
-        EaseInBounce<public>(Value:float):float = {
+        EaseInBounce<public>(Value:float)<computes>:float = {
             1 - EaseOutBounce(1 - Value)
         }
-        EaseOutBounce<public>(Value:float):float = {
+        EaseOutBounce<public>(Value:float)<computes>:float = {
             Constant1 := 7.5625
             Constant2 := 2.75
 
@@ -412,7 +477,7 @@ MathFeatures<public> := module {
                 Constant1 * (Value - 2.625 / Constant2) * Value + 0.984375
             }
         }
-        EaseInOutBounce<public>(Value:float):float = {
+        EaseInOutBounce<public>(Value:float)<computes>:float = {
             if (Value < 0.5) {
                 (1 - EaseOutBounce(1 - 2 * Value)) / 2
             } else {
@@ -421,43 +486,14 @@ MathFeatures<public> := module {
         }
     }
 
-    # Obsolete, use RotateAroundAnchor methods instead
-    # (Point:vector3).RotateAround<public>(Anchor:vector3, Axis:vector3, AngleRadians:float)<transacts> : vector3 = {
-    #     TranslatedPoint := Point - Anchor
-    #     TranslatedPoint.RotateAngleAxis(AngleRadians, Axis) + Anchor
-    # }
-
-    # (Pos:vector3).RotateAngleAxis<public>(AngleRadians:float, Axis:vector3)<transacts> : vector3 = {
-
-    #     SinVal := Sin(AngleRadians)
-    #     CosVal := Cos(AngleRadians)
-
-    #     AxisXX := Pow(Axis.X, 2.0)
-    #     AxisYY := Pow(Axis.Y, 2.0)
-    #     AxisZZ := Pow(Axis.Z, 2.0)
-
-    #     AxisXY := Axis.X * Axis.Y
-    #     AxisYZ := Axis.Y * Axis.Z
-    #     AxisZX := Axis.Z * Axis.X
-
-    #     AxisXS := Axis.X * SinVal
-    #     AxisYS := Axis.Y * SinVal
-    #     AxisZS := Axis.Z * SinVal
-
-    #     OMC := 1.0 - CosVal
-
-    #     vector3{
-    #         X := (OMC * AxisXX + CosVal) * Pos.X + (OMC * AxisXY - AxisZS) * Pos.Y + (OMC * AxisZX + AxisYS) * Pos.Z
-    #         Y := (OMC * AxisXY + AxisZS) * Pos.X + (OMC * AxisYY + CosVal) * Pos.Y + (OMC * AxisYZ - AxisXS) * Pos.Z
-    #         Z := (OMC * AxisZX - AxisYS) * Pos.X + (OMC * AxisYZ  + AxisXS) * Pos.Y + (OMC * AxisZZ + CosVal) * Pos.Z
-    #     }
-    # }
-
-    (Point:vector3).RotateAroundAnchor<public>(Anchor:vector3, Axis:vector3, AngleRadians:float)<transacts> : vector3 = {
+    # Rotate a point in 3D space around an anchor point on a specific axis
+    (Point:vector3).RotateAroundAnchor<public>(Anchor:vector3, Axis:vector3, AngleRadians:float)<transacts>:vector3 = {
         MakeRotation(Axis, AngleRadians).RotateVector(Point - Anchor) + Anchor
     }
 
-    (Point:vector2).RotateAroundAnchor<public>(Anchor:vector2, AngleRadians:float)<transacts> : vector2 = {
-        (MakeRotation(vector3{Z := 1.0}, AngleRadians).RotateVector(Point.ToVector3() - Anchor.ToVector3()) + Anchor.ToVector3()).ToVector2()
+    # Rotate a point in 2D space around an anchor point
+    (Point:vector2).RotateAroundAnchor<public>(Anchor:vector2, AngleRadians:float)<transacts>:vector2 = {
+        Anchor3 := Anchor.ToVector3()
+        (MakeRotation(vector3{Z := 1.0}, AngleRadians).RotateVector(Point.ToVector3() - Anchor3) + Anchor3).ToVector2()
     }
 }
