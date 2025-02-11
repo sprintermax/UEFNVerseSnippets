@@ -1,7 +1,41 @@
+using. /Fortnite.com/Game
 using. /UnrealEngine.com/Temporary/UI
 using. /Verse.org/Simulation
 
 Wrappers<public> := module {
+
+    instant_callback_wrapper_delayed<internal>(PassThroughType:type)<computes> := class {
+        Proxy(Payload:PassThroughType)<suspends>:void = Callback.Signal(Payload)
+        Callback : event(PassThroughType) = event(PassThroughType){}
+    }
+
+    instant_callback_wrapper<internal>(PassThroughType:type)<computes> := class {
+        Proxy(Payload:PassThroughType):void = Callback.Signal(Payload)
+        Callback : event(PassThroughType) = event(PassThroughType){}
+    }
+
+
+    (RoundManager:fort_round_manager).AwaitRoundStart<public>()<suspends>:void = {
+        Wrapper := instant_callback_wrapper_delayed(void){}
+        race {
+            Wrapper.Callback.Await()
+            block {
+                RoundManager.SubscribeRoundStarted(Wrapper.Proxy)
+                Sleep(Inf)
+            }
+        }
+    }
+
+    (RoundManager:fort_round_manager).AwaitRoundEnd<public>()<suspends>:void = {
+        Wrapper := instant_callback_wrapper(void){}
+        race {
+            Wrapper.Callback.Await()
+            block {
+                RoundManager.SubscribeRoundEnded(Wrapper.Proxy)
+                Sleep(Inf)
+            }
+        }
+    }
 
     wrapper_generic(PassThroughType:type, DataType:type)<computes> := class<computes> {
         ExtraData:DataType
