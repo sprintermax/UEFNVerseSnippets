@@ -47,7 +47,7 @@ NoiseUtils<public> := module {
         DY := Y - IY
         DZ := Z - IZ
         Gradient := RandomGradient(IX, IY, IZ, Seed)
-        DX * Gradient(0) + DY * Gradient(1) + DZ + Gradient(2)
+        DX * Gradient(0) + DY * Gradient(1) + DZ * Gradient(2)
     }
 
     Fade<internal>(T:float)<transacts>:float = {
