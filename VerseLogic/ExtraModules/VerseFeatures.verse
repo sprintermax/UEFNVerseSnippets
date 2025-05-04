@@ -6,7 +6,7 @@ VerseFeatures<public> := module {
     ### Logic Utils
 
     Success<public>()<computes><decides>:void = true?
-    Failure<public>()<computes><decides>:void = false?
+    Failure<public>()<computes><decides>:false = false? and Err("Unreachable")
 
     (VerseFeatures:)ToString<public>(Input:logic)<computes>:string = {
         if (Input?) { "true" } else { "false" }
@@ -15,6 +15,15 @@ VerseFeatures<public> := module {
     (Logic:logic).Invert<public>()<computes>:logic = if (Logic?) { false } else { true }
 
     prefix'-'<public>(Logic:logic)<computes>:logic = Logic.Invert()
+
+
+
+    ### Agent Utils
+
+    (Agent:agent).IsValid<public>()<transacts><decides>:void = {
+        player[Agent].IsActive[] or not player[Agent]
+        Agent.GetFortCharacter[].IsActive[]
+    }
 
 
 

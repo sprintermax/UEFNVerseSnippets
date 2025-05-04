@@ -9,16 +9,18 @@ PersistablePlayerData<public> := module {
 
     persistable_player_data<public> := class<final><persistable> {
         # Versioning
-        PersistentDataVersion<public>:int = 0 # Last Played Version of Persistable Data
-        LastViewedPatchVersion<public>:int = 0 # Last Patch Notes Seen
+        PersistentDataVersion<public>:int = -1 # Last Played Version of Persistable Data
+        LastViewedPatchVersion<public>:int = -1 # Last Patch Notes Seen
         
         # Global Stats
+        Score<public>:int = 0 # Example
     }
 
     (Player:player).MakePersistableData<public><constructor>(Source:persistable_player_data)<transacts> := persistable_player_data {
         PersistentDataVersion := Source.PersistentDataVersion
         LastViewedPatchVersion := Source.LastViewedPatchVersion
-
+        
+        Score := Source.Score
     }
 
     (Player:player).SavePersistableData<public>(NewPersistablePlayerData:persistable_player_data)<transacts><decides>:void = {

@@ -7,34 +7,34 @@ using. VerseFeatures
 # I don't use this anymore, made for testing but daily usage of this on projects were not good enough.
 DebugFeatures<public> := module {
 
-    PrintAndFail<public>(Message:string, ?Duration:float=2.0, ?Color:color=NamedColors.White)<transacts><decides>:void = {
+    Print<public>((Message:string, Value:t, ?Duration:float=2.0, ?Color:color=NamedColors.White) where t :subtype(any))<transacts>:t = {
+        Print(Message, ?Duration := Duration, ?Color := Color)
+        Value
+    }
+
+    Print<public>((Message:message, Value:t, ?Duration:float=2.0, ?Color:color=NamedColors.White) where t :subtype(any))<transacts>:t = {
+        Print(Message, ?Duration := Duration, ?Color := Color)
+        Value
+    }
+
+    Print<public>((Message:diagnostic, Value:t, ?Duration:float=2.0, ?Color:color=NamedColors.White) where t :subtype(any))<transacts>:t = {
+        Print(Message, ?Duration := Duration, ?Color := Color)
+        Value
+    }
+
+    PrintAndFail<public>(Message:string, ?Duration:float=2.0, ?Color:color=NamedColors.White)<transacts><decides>:false = {
         Print(Message, ?Duration := Duration, ?Color := Color)
         Failure[]
     }
 
-    PrintAndFail<public>(Message:message, ?Duration:float=2.0, ?Color:color=NamedColors.White)<transacts><decides>:void = {
+    PrintAndFail<public>(Message:message, ?Duration:float=2.0, ?Color:color=NamedColors.White)<transacts><decides>:false = {
         Print(Message, ?Duration := Duration, ?Color := Color)
         Failure[]
     }
 
-    PrintAndFail<public>(Message:diagnostic, ?Duration:float=2.0, ?Color:color=NamedColors.White)<transacts><decides>:void = {
+    PrintAndFail<public>(Message:diagnostic, ?Duration:float=2.0, ?Color:color=NamedColors.White)<transacts><decides>:false = {
         Print(Message, ?Duration := Duration, ?Color := Color)
         Failure[]
-    }
-
-    PrintAndFail<public>(Message:diagnostic, Value:t, (?Duration:float=2.0), (?Color:color=NamedColors.White) where t:subtype(any))<transacts><decides>:t = {
-        PrintAndFail[Message, ?Duration := Duration, ?Color := Color]
-        Err("Unreachable")
-    }
-
-    PrintAndFail<public>(Message:string, Value:t, (?Duration:float=2.0), (?Color:color=NamedColors.White) where t:subtype(any))<transacts><decides>:t = {
-        PrintAndFail[Message, ?Duration := Duration, ?Color := Color]
-        Err("Unreachable")
-    }
-
-    PrintAndFail<public>(Message:message, Value:t, (?Duration:float=2.0), (?Color:color=NamedColors.White) where t:subtype(any))<transacts><decides>:t = {
-        PrintAndFail[Message, ?Duration := Duration, ?Color := Color]
-        Err("Unreachable")
     }
 
     # Logger := class(log){}

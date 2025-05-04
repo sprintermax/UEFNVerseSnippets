@@ -9,13 +9,16 @@ TextLocalization<public> := module {
     MessageFromFloat<public><localizes>(Value:float):message = "{Value}"
 
     ### Common and Placeholder localization texts
-    Loc_Common_EmptyMessage<public><localizes>:message = ""
-    Loc_Common_SingleSpace<public><localizes>:message = " "
+    Loc_Common_EmptyMessage<public><localizes>:message = "​" # Uses Zero Width Space to avoid auto localization breaking
+    Loc_Common_SingleSpace<public><localizes>:message = "​ " # Uses Zero Width Space to avoid auto localization breaking
     Loc_Common_Unknown<public><localizes>:message = "Unknown"
     Loc_Common_Missing<public><localizes>:message = "Missing"
     Loc_Common_Unavailable<public><localizes>:message = "Unavailable"
     Loc_Common_Placeholder<public><localizes>:message = "Placeholder"
     Loc_Common_Placeholder_Short<public><localizes>:message = "[PH]"
+    Loc_Common_Placeholder_Soon<public><localizes>:message = "Soon"
+    Loc_Common_Placeholder_ComingSoon<public><localizes>:message = "Coming Soon"
+    Loc_Common_NewLine<public><localizes>:message = "​\n" # Uses Zero Width Space to avoid auto localization breaking
 
     ### Generic localization Texts
     Loc_Common_Number_0<public><localizes> : message = "0"

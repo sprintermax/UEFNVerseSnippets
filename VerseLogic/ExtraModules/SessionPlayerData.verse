@@ -1,13 +1,18 @@
 using. /Verse.org/Simulation
 
+using. VerseFeatures
+
 SessionPlayerData<public> := module {
 
-    var SessionPlayerDataMap<public>:weak_map(session, [player]session_player_data) = map{}
+    var SessionPlayerDataMap<public>:weak_map(session, [agent]session_player_data) = map{}
 
     session_player_data<public> := class {
-        PlayerBackRef<public>:player
+        PlayerBackRef<public>:agent
         # Playspace:fort_playspace
         var GlobalSubscriptions<private>:[]cancelable = array{}
+
+        # Stats
+        var<private> Score<public>:int = 0
 
         RegisterSubscription<public>(Subscription:cancelable):void = {
             set GlobalSubscriptions += array{Subscription}
@@ -19,6 +24,8 @@ SessionPlayerData<public> := module {
             }
             set GlobalSubscriptions = array{}
         }
+
+        IsRealPlayer<public>()<transacts><decides>:void = player[PlayerBackRef]
     }
 
     (Session:session).InitializeSessionDataMap<internal>()<transacts><decides>:void = {
@@ -27,51 +34,71 @@ SessionPlayerData<public> := module {
         }
     }
 
-    (Session:session).GetAllPlayersData<public>()<transacts><decides>:[player]session_player_data = {
+    (Session:session).GetAllPlayersData<public>()<transacts><decides>:[agent]session_player_data = {
         Session.InitializeSessionDataMap[]
         SessionPlayerDataMap[Session]
     }
 
-    (Player:player).SaveSessionData<public>(NewSessionPlayerData:session_player_data)<transacts><decides>:void = {
+    (Player:agent).SetSessionData<public>(NewSessionPlayerData:session_player_data)<transacts><decides>:void = {
         CurrentSession := GetSession()
         CurrentSession.InitializeSessionDataMap[]
 
-        Player.IsActive[]
+        # Player.IsActive[]
+        Player.IsValid[]
         set SessionPlayerDataMap[CurrentSession][Player] = NewSessionPlayerData
     }
 
-    (Player : player).HasSessionDataData<public>()<transacts><decides> : void = {
+    (Player:agent).HasSessionDataData<public>()<transacts><decides> : void = {
         CurrentSession := GetSession()
         
-        Player.IsActive[]
+        # Player.IsActive[]
+        Player.IsValid[]
         SessionPlayerDataMap[CurrentSession][Player]
     }
 
-    (Player:player).GetSessionData<public>()<transacts><decides>:session_player_data = {
+    (Player:agent).GetSessionData<public>()<transacts><decides>:session_player_data = {
         CurrentSession := GetSession()
         CurrentSession.InitializeSessionDataMap[]
 
-        Player.IsActive[]
+        # Player.IsActive[]
+        Player.IsValid[]
         if (ExistingPlayerData := SessionPlayerDataMap[CurrentSession][Player]) {
             return ExistingPlayerData
         } else {
-            NewPlayerData := session_player_data{
-                PlayerBackRef := Player
+            NewPlayerData := if (RealPlayer := player[Player]) {
+                if (PPlayerData := RealPlayer.GetPersistableData[]) {
+                    session_player_data{
+                        PlayerBackRef := Player
+                        Score := PPlayerData.Score
+                    }
+                } else {
+                    Print("Failed to get persistable data for player, initializing default session data")
+                    session_player_data{
+                        PlayerBackRef := Player
+                        Score := 0
+                    }
+                }
+            } else {
+                session_player_data{
+                    PlayerBackRef := Player
+                    Score := GetRandomInt(0, 100) # Example populating random data for Test Players or other Agents
+                }
             }
             Player.SaveSessionData[NewPlayerData]
             return NewPlayerData
         }
     }
 
-    (Player:player).DeleteSessionData<public>()<transacts><decides>:void = {
+    (Player:agent).DeleteSessionData<public>()<transacts><decides>:void = {
         CurrentSession := GetSession()
         CurrentSession.InitializeSessionDataMap[]
 
-        var TempSessionPlayerDataMap:[player]session_player_data = map{}
+        var TempSessionPlayerDataMap:[agent]session_player_data = map{}
         for (
             StoredPlayer->StoredPlayerData:CurrentSession.GetAllPlayersData[]
             StoredPlayer <> Player
-            StoredPlayer.IsActive[]
+            # StoredPlayer.IsActive[]
+            StoredPlayer.IsValid[]
             set TempSessionPlayerDataMap[StoredPlayer] = StoredPlayerData
         ) {}
 

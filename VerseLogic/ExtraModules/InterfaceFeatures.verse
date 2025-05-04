@@ -138,6 +138,7 @@ InterfaceFeatures<public> := module {
         BottomLeft<public>:vector2 = vector2{X := 0.0, Y := 1.0 }
         BottomMiddle<public>:vector2 = vector2{X := 0.5, Y := 1.0 }
         BottomRight<public>:vector2 = vector2{X := 1.0, Y := 1.0 }
+        Custom<public>(X:float, Y:float)<transacts>:vector2 = vector2{X := X, Y := Y }
     }
 
     MarginPresets<public> := module {
