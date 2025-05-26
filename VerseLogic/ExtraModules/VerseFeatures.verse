@@ -1,5 +1,7 @@
+using. /Fortnite.com/Characters
 using. /UnrealEngine.com/Temporary
 using. /UnrealEngine.com/Temporary/UI
+using. /Verse.org/Simulation
 
 VerseFeatures<public> := module {
 
@@ -270,35 +272,90 @@ VerseFeatures<public> := module {
 
     ### Containers
 
-    # Generic container class that can be used for FIFO, LIFO, and other common types of array data storage
+    # Generic container class that can be used for FIFO/LIFO/Linked Lists and other common types of array data storage implementations
+    # Note: due to current verse limitations, we can't have mutable members (variables) in parametric classes, and for that reason
+    # is needed to handle and keep track of the container state changes outside of the class
     Container<public>(t:type) := class<computes> {
         Elements<public> :[]t = array{}
+
+        PointerPosition<public>:int = 0
 		
         Size<public>()<computes>:int = Elements.Length
         IsEmpty<public>()<decides><computes>:void = Elements.Length = 0
+        IsPointerValid<public>(?Position:int = PointerPosition)<decides><computes>:void = Position >= 0 and Position < Elements.Length # Should only fail if has 0 elements due to the class automatically sanitizing the pointer position
 
-        AddFirst<public>(Element:t)<computes>:Container(t) = Container(t){ Elements := array{Element} + Elements }
-        AddLast<public>(Element:t)<computes>:Container(t) = Container(t){ Elements := Elements + array{Element} }
+        SetPointerPosition<public>(Position:int, ?Circular:logic = false)<decides><computes>:Container(t) = Container(t){
+            PointerPosition := if (Circular?) {
+                NormalizeIndex[Elements.Length, Position]
+            } else {
+                IsPointerValid[?Position := Position]
+                Position
+            }
+            Elements := Elements
+        }
+        SetPointerOffset<public>(Offset:int, ?Circular:logic = false)<decides><computes>:Container(t) = SetPointerPosition[PointerPosition + Offset, ?Circular := Circular]
+
+        AddFirst<public>(Element:t)<computes>:Container(t) = Container(t){
+            PointerPosition := PointerPosition + 1
+            Elements := array{Element} + Elements
+        }
+        AddLast<public>(Element:t)<computes>:Container(t) = Container(t){
+            PointerPosition := PointerPosition
+            Elements := Elements + array{Element}
+        }
 
         # Get the value at an specific index
         # Fails if not able to find a value on the provided index
-        # If Strict is set to False (Default), out of bound indexes will be normalized to array bounds
+        # If Strict is set to false (Default), out of bound indexes will be normalized to array bounds
         # If Strict is set to true, out of bound indexes will not be normalized and will cause a fail
-        GetAt<public>(Index:int, ?Strict:logic=false)<decides><computes>:tuple(Container(t), t) = {
+        GetAtIndex<public>(Index:int, ?Strict:logic=false)<decides><computes>:tuple(Container(t), t) = {
             TargetIndex := if (Strict?). Index else. NormalizeIndex[Elements.Length, Index]
-            (Container(t){ Elements := Elements.RemoveElement[TargetIndex] }, Elements[TargetIndex])
+
+            (Container(t){
+                PointerPosition := if (PointerPosition < TargetIndex). PointerPosition else. Max(0, Min(PointerPosition - 1, Elements.Length - 2))
+                Elements := Elements.RemoveElement[TargetIndex]
+            }, Elements[TargetIndex])
         }
 
-        GetFirst<public>()<decides><computes>:tuple(Container(t), t) = (Container(t){ Elements := Elements.RemoveElement[0] }, Elements[0])
-        GetLast<public>()<decides><computes>:tuple(Container(t), t) = (Container(t){ Elements := Elements.RemoveElement[Elements.Length - 1] }, Elements[Elements.Length - 1])
+        GetAtPointer<public>()<decides><computes>:t = Elements[PointerPosition]
 
-        (local:)SortBy<public>(Less:type {_(:t, :t)<computes><decides>:void})<computes>:Container(t) = {
-            Container(t){ Elements := SortBy(Elements, Less) }
+        GetFirst<public>()<decides><computes>:tuple(Container(t), t) = (
+            Container(t){
+                PointerPosition := Max(PointerPosition - 1, 0)
+                Elements := Elements.RemoveElement[0]
+            },
+            Elements[0]
+        )
+        
+        GetLast<public>()<decides><computes>:tuple(Container(t), t) = (
+            Container(t){
+                PointerPosition := Max(0, Min(PointerPosition, Elements.Length - 1))
+                Elements := Elements.RemoveElement[Elements.Length - 1]
+            },
+            Elements[Elements.Length - 1]
+        )
+
+        ### WIP Features
+        # AddAt
+        # Find
+        # FindAll
+        # Reduce ?
+        # Splice
+
+        (local:)SortBy<public>(Less:type {_(:t, :t)<computes><decides>:void})<computes>:Container(t) = Container(t){
+            PointerPosition := PointerPosition
+            Elements := SortBy(Elements, Less)
         }
 
         # Aliases
+        PreviousPointer<public>(?Circular:logic = false)<decides><computes>:Container(t) = SetPointerOffset[-1, ?Circular := Circular]
+        NextPointer<public>(?Circular:logic = false)<decides><computes>:Container(t) = SetPointerOffset[1, ?Circular := Circular]
+
         Push<public>(Element:t)<computes>:Container(t) = AddLast(Element)
         Pop<public>()<computes><decides>:tuple(Container(t), t) = GetLast[]
+
+        Unshift<public>(Element:t)<computes>:Container(t) = AddFirst(Element)
+        Shift<public>()<computes><decides>:tuple(Container(t), t) = GetFirst[]
     }
 
     ### String Utils

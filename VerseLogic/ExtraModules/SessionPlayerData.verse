@@ -1,5 +1,7 @@
+using. /Verse.org/Random
 using. /Verse.org/Simulation
 
+using. PersistablePlayerData
 using. VerseFeatures
 
 SessionPlayerData<public> := module {
@@ -84,7 +86,7 @@ SessionPlayerData<public> := module {
                     Score := GetRandomInt(0, 100) # Example populating random data for Test Players or other Agents
                 }
             }
-            Player.SaveSessionData[NewPlayerData]
+            Player.SetSessionData[NewPlayerData]
             return NewPlayerData
         }
     }

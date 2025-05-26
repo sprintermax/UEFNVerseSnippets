@@ -157,7 +157,7 @@ MathFeatures<public> := module {
 
     # Makes an array of possible choices that can be used on GetRandomByWeights[]
     # Array of Elements and Weights are supposed to have the same length
-    # If Strict is set to false, will auto assign weight of 0 to exceding elements
+    # If Strict is set to false (Default), will auto assign weight of 0 to exceding elements
     # If Strict is set to true, will force a fail if array lengths don't match.
     (Elements:[]t).AssignChoiceWeights<public>(Weights:[]int, (?Strict:logic = false) where t:type)<transacts><decides>:[]tuple(t, int) = {
         Elements.Length = Weights.Length or not Strict?
@@ -169,7 +169,7 @@ MathFeatures<public> := module {
     }
 
     # Returns a random element by considering priority weight over others (ChoiceData, Weight)
-    # Elements with negative or weight of 0 will never be selected
+    # Elements with weight of 0 or negative values will never be selected
     GetRandomByWeights<public>(Choices:[]tuple(t, int) where t:type)<transacts><decides>:t = {
         var TotalWeight : int = 0
 
