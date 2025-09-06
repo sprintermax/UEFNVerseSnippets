@@ -132,51 +132,6 @@ StringManipulation<public> := module {
         ResultingString
     }
 
-    # NOTE: Works but is obsolete, made the new functions above to avoid duplicated code on the different functions
-    <# ToUpperCase<public>(String:string, ?IgnoreSpecialChars:logic=false)<transacts>:string = {
-        if (String.Length <= 0). return ""
-
-        var ResultingString : string = ""
-
-        for (Char : String) {
-            CharString := "{Char}"
-
-            NewCharString := if (CharCode := PrintableCharacters[CharString], lowercase_alphabet_characters_range[CharCode]) {
-                PrintableCharacters.FindKeyByValue[CharCode - 32] or Err("Unreachable")
-            } else if (not IgnoreSpecialChars?, CharCode := ExtendedCharacters[CharString], lowercase_special_characters_range[CharCode]) {
-                if (CharCode = 156). ExtendedCharacters.FindKeyByValue[140] or Err("Unreachable")
-                else if (CharCode = 255). ExtendedCharacters.FindKeyByValue[159] or Err("Unreachable")
-                else. ExtendedCharacters.FindKeyByValue[CharCode - 32] or Err("Unreachable")
-            } else. CharString
-
-            set ResultingString += NewCharString
-        }
-
-        ResultingString
-    }
-
-    ToLowerCase<public>(String:string, ?IgnoreSpecialChars:logic=false)<transacts>:string = {
-        if (String.Length <= 0). return ""
-
-        var ResultingString : string = ""
-
-        for (Char : String) {
-            CharString := "{Char}"
-
-            NewCharString := if (CharCode := PrintableCharacters[CharString], uppercase_alphabet_characters_range[CharCode]) {
-                PrintableCharacters.FindKeyByValue[CharCode + 32] or Err("Unreachable")
-            } else if (not IgnoreSpecialChars?, CharCode := ExtendedCharacters[CharString], uppercase_special_characters_range[CharCode]) {
-                if (CharCode = 140). ExtendedCharacters.FindKeyByValue[156] or Err("Unreachable")
-                else if (CharCode = 159). ExtendedCharacters.FindKeyByValue[255] or Err("Unreachable")
-                else. ExtendedCharacters.FindKeyByValue[CharCode + 32] or Err("Unreachable")
-            } else. CharString
-            
-            set ResultingString += NewCharString
-        }
-
-        ResultingString
-    } #>
-
     GetRandomString<public>(Length:int, ?UseNumbers:logic=false, ?UseSymbols:logic=false, ?UseSpecialChars:logic=false)<transacts>:string = {
         if (Length <= 0). return ""
 
