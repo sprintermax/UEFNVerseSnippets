@@ -5,34 +5,35 @@ using. /UnrealEngine.com/Temporary/Diagnostics
 using. VerseFeatures
 
 # I don't use this anymore, made for testing but daily usage of this on projects were not good enough.
+# I plan to make a better logger module in the future
 DebugFeatures<public> := module {
 
-    Print<public>((Message:string, Value:t, ?Duration:float=2.0, ?Color:color=NamedColors.White) where t :subtype(any))<transacts>:t = {
+    Print<public>(Message:string, ReturnValue:t, ?Duration:float=2.0, (?Color:color=NamedColors.White) where t:type)<transacts>:t = {
         Print(Message, ?Duration := Duration, ?Color := Color)
-        Value
+        ReturnValue
     }
 
-    Print<public>((Message:message, Value:t, ?Duration:float=2.0, ?Color:color=NamedColors.White) where t :subtype(any))<transacts>:t = {
+    Print<public>(Message:message, ReturnValue:t, ?Duration:float=2.0, (?Color:color=NamedColors.White) where t:type)<transacts>:t = {
         Print(Message, ?Duration := Duration, ?Color := Color)
-        Value
+        ReturnValue
     }
 
-    Print<public>((Message:diagnostic, Value:t, ?Duration:float=2.0, ?Color:color=NamedColors.White) where t :subtype(any))<transacts>:t = {
+    Print<public>(Message:diagnostic, ReturnValue:t, ?Duration:float=2.0, (?Color:color=NamedColors.White) where t:type)<transacts>:t = {
         Print(Message, ?Duration := Duration, ?Color := Color)
-        Value
+        ReturnValue
     }
 
-    PrintAndFail<public>(Message:string, ?Duration:float=2.0, ?Color:color=NamedColors.White)<transacts><decides>:false = {
-        Print(Message, ?Duration := Duration, ?Color := Color)
-        Failure[]
-    }
-
-    PrintAndFail<public>(Message:message, ?Duration:float=2.0, ?Color:color=NamedColors.White)<transacts><decides>:false = {
+    PrintAndFail<public>(Message:string, ?Duration:float=2.0, ?Color:color=NamedColors.White)<decides><transacts>:false = {
         Print(Message, ?Duration := Duration, ?Color := Color)
         Failure[]
     }
 
-    PrintAndFail<public>(Message:diagnostic, ?Duration:float=2.0, ?Color:color=NamedColors.White)<transacts><decides>:false = {
+    PrintAndFail<public>(Message:message, ?Duration:float=2.0, ?Color:color=NamedColors.White)<decides><transacts>:false = {
+        Print(Message, ?Duration := Duration, ?Color := Color)
+        Failure[]
+    }
+
+    PrintAndFail<public>(Message:diagnostic, ?Duration:float=2.0, ?Color:color=NamedColors.White)<decides><transacts>:false = {
         Print(Message, ?Duration := Duration, ?Color := Color)
         Failure[]
     }
@@ -48,48 +49,65 @@ DebugFeatures<public> := module {
             LogError # critical errors that will always break the game, in a perfect scenario you should never see this on a project ready to release
         }
 
-        # Arbitrary template for logging messages with default or custom values
-        Log<public>(Text:string, ?LogVariant:log_variant = log_variant.LogInformation):void = {
+        # Arbitrary template for logging messages
+        (Logger:)Log<public>(Data:any, ReturnValue:t, (?LogVariant:log_variant=log_variant.LogInformation) where t:type)<transacts>:t = {
             case (LogVariant) {
-                log_variant.LogInformation => Print(Text, ?Duration := 2.0, ?Color := NamedColors.White)
-                log_variant.LogSuccess => Print(Text, ?Duration:= 3.0, ?Color := NamedColors.Green)
-                log_variant.LogCosmetic => Print(Text, ?Duration := 5.0, ?Color := NamedColors.SkyBlue)
-                log_variant.LogWarning => Print(Text, ?Duration:= 7.5, ?Color := NamedColors.Yellow)
-                log_variant.LogError => Print(Text, ?Duration:= 10.0, ?Color := NamedColors.Red)
+                log_variant.LogInformation => Print(ToDiagnostic(Data), ReturnValue, ?Duration := 2.0, ?Color := NamedColors.White)
+                log_variant.LogSuccess => Print(ToDiagnostic(Data), ReturnValue, ?Duration:= 3.0, ?Color := NamedColors.Green)
+                log_variant.LogCosmetic => Print(ToDiagnostic(Data), ReturnValue, ?Duration := 5.0, ?Color := NamedColors.SkyBlue)
+                log_variant.LogWarning => Print(ToDiagnostic(Data), ReturnValue, ?Duration:= 7.5, ?Color := NamedColors.Yellow)
+                log_variant.LogError => Print(ToDiagnostic(Data), ReturnValue, ?Duration:= 10.0, ?Color := NamedColors.Red)
             }
         }
 
-        # Log templates
-        Log_Information<public>(Text:string):void = Log(Text, ?LogVariant := log_variant.LogInformation)
-        Log_OperationSuccess<public>(Text:string):void = Log(Text, ?LogVariant := log_variant.LogSuccess)
-        Log_CosmeticWarning<public>(Text:string):void = Log(Text, ?LogVariant := log_variant.LogCosmetic)
-        Log_ConfigurationWarning<public>(Text:string):void = Log(Text, ?LogVariant := log_variant.LogWarning)
-        Log_CriticalError<public>(Text:string):void = Log(Text, ?LogVariant := log_variant.LogError)
+        Log<public>(Data:any, ?LogVariant:log_variant=log_variant.LogInformation)<transacts>:void = {
+            Log(Data, void, ?LogVariant := LogVariant)
+        }
+
+        LogAndFail<public>(Data:any, ?LogVariant:log_variant=log_variant.LogInformation)<decides><transacts>:false = {
+            Log(Data, void, ?LogVariant := LogVariant)
+            Failure[]
+        }
     }
 
-    prefixable_message_logger<public> := interface() {
-        GetLogPrefix<public><localizes>():string
+    message_logger<public> := interface {
+        LogPrefix<public> : string = ""
+
+        Log<public>(Data:any, ?LogVariant:Logger.log_variant=Logger.log_variant.LogInformation)<transacts>:void = Logger.Log(LogPrefix + ToDiagnostic(Data), void, ?LogVariant := LogVariant)
+        (message_logger:)Log<public>(Data:any, ReturnValue:t, (?LogVariant:Logger.log_variant=Logger.log_variant.LogInformation) where t:type)<transacts>:t = Logger.Log(LogPrefix + ToDiagnostic(Data), ReturnValue, ?LogVariant := LogVariant)
+        LogAndFail<public>(Data:any, ?LogVariant:Logger.log_variant=Logger.log_variant.LogInformation)<decides><transacts>:false = Logger.LogAndFail[LogPrefix + ToDiagnostic(Data), ?LogVariant := LogVariant]
+
+        Log_Information<public>(Data:any)<transacts>:void = Logger.Log(LogPrefix + ToDiagnostic(Data), void, ?LogVariant := Logger.log_variant.LogInformation)
+        Log_OperationSuccess<public>(Data:any)<transacts>:void = Logger.Log(LogPrefix + ToDiagnostic(Data), void, ?LogVariant := Logger.log_variant.LogSuccess)
+        Log_CosmeticWarning<public>(Data:any)<transacts>:void = Logger.Log(LogPrefix + ToDiagnostic(Data), void, ?LogVariant := Logger.log_variant.LogCosmetic)
+        Log_ConfigurationWarning<public>(Data:any)<transacts>:void = Logger.Log(LogPrefix + ToDiagnostic(Data), void, ?LogVariant := Logger.log_variant.LogWarning)
+        Log_CriticalError<public>(Data:any)<transacts>:void = Logger.Log(LogPrefix + ToDiagnostic(Data), void, ?LogVariant := Logger.log_variant.LogError)
+
+        # LogCallback_Information<public>(Data:any, ReturnValue:t where t:type)<transacts>:t = Logger.Log(LogPrefix + ToDiagnostic(Data), ReturnValue, ?LogVariant := Logger.log_variant.LogInformation)
+        # LogCallback_OperationSuccess<public>(Data:any, ReturnValue:t where t:type)<transacts>:t = Logger.Log(LogPrefix + ToDiagnostic(Data), ReturnValue, ?LogVariant := Logger.log_variant.LogSuccess)
+        # LogCallback_CosmeticWarning<public>(Data:any, ReturnValue:t where t:type)<transacts>:t = Logger.Log(LogPrefix + ToDiagnostic(Data), ReturnValue, ?LogVariant := Logger.log_variant.LogCosmetic)
+        # LogCallback_ConfigurationWarning<public>(Data:any, ReturnValue:t where t:type)<transacts>:t = Logger.Log(LogPrefix + ToDiagnostic(Data), ReturnValue, ?LogVariant := Logger.log_variant.LogWarning)
+        # LogCallback_CriticalError<public>(Data:any, ReturnValue:t where t:type)<transacts>:t = Logger.Log(LogPrefix + ToDiagnostic(Data), ReturnValue, ?LogVariant := Logger.log_variant.LogError)
+
+        LogAndFail_Information<public>(Data:any)<decides><transacts>:false = Logger.LogAndFail[LogPrefix + ToDiagnostic(Data), ?LogVariant := Logger.log_variant.LogInformation]
+        LogAndFail_OperationSuccess<public>(Data:any)<decides><transacts>:false = Logger.LogAndFail[LogPrefix + ToDiagnostic(Data), ?LogVariant := Logger.log_variant.LogSuccess]
+        LogAndFail_CosmeticWarning<public>(Data:any)<decides><transacts>:false = Logger.LogAndFail[LogPrefix + ToDiagnostic(Data), ?LogVariant := Logger.log_variant.LogCosmetic]
+        LogAndFail_ConfigurationWarning<public>(Data:any)<decides><transacts>:false = Logger.LogAndFail[LogPrefix + ToDiagnostic(Data), ?LogVariant := Logger.log_variant.LogWarning]
+        LogAndFail_CriticalError<public>(Data:any)<decides><transacts>:false = Logger.LogAndFail[LogPrefix + ToDiagnostic(Data), ?LogVariant := Logger.log_variant.LogError]
     }
 
-    (PrefixableLogger:prefixable_message_logger).Log<public>(Text:string, ?LogVariant:Logger.log_variant = Logger.log_variant.LogInformation):void = Logger.Log(Msg_Debug_Prefix_Custom_Start + PrefixableLogger.GetLogPrefix() + Msg_Debug_Prefix_Custom_End + Text, ?LogVariant := LogVariant)
-    (PrefixableLogger:prefixable_message_logger).Log_Information<public>(Text:string):void = Logger.Log_Information(Msg_Debug_Prefix_Custom_Start + PrefixableLogger.GetLogPrefix() + Msg_Debug_Prefix_Custom_End + Text)
-    (PrefixableLogger:prefixable_message_logger).Log_OperationSuccess<public>(Text:string):void = Logger.Log_OperationSuccess(Msg_Debug_Prefix_Custom_Start + PrefixableLogger.GetLogPrefix() + Msg_Debug_Prefix_Custom_End + Text)
-    (PrefixableLogger:prefixable_message_logger).Log_CosmeticWarning<public>(Text:string):void = Logger.Log_CosmeticWarning(Msg_Debug_Prefix_Custom_Start + PrefixableLogger.GetLogPrefix() + Msg_Debug_Prefix_Custom_End + Text)
-    (PrefixableLogger:prefixable_message_logger).Log_ConfigurationWarning<public>(Text:string):void = Logger.Log_ConfigurationWarning(Msg_Debug_Prefix_Custom_Start + PrefixableLogger.GetLogPrefix() + Msg_Debug_Prefix_Custom_End + Text)
-    (PrefixableLogger:prefixable_message_logger).Log_CriticalError<public>(Text:string):void = Logger.Log_CriticalError(Msg_Debug_Prefix_Custom_Start + PrefixableLogger.GetLogPrefix() + Msg_Debug_Prefix_Custom_End + Text)
-    
 
-    
+
     ### Debug messages
 
     # Common Debug prefixes
     Msg_Debug_Prefix_Custom_Start<public>:string = "["
     Msg_Debug_Prefix_Custom_End<public>:string = "] "
 
-    Msg_Debug_Prefix_Common_Error<public>:string = "[ERROR]"
-    Msg_Debug_Prefix_Common_Warn<public>:string = "[WARN]"
-    Msg_Debug_Prefix_Common_Info<public>:string = "[INFO]"
-    Msg_Debug_Prefix_Common_Done<public>:string = "[DONE]"
+    Msg_Debug_Prefix_Common_Error<public>:string = "[ERROR] "
+    Msg_Debug_Prefix_Common_Warn<public>:string = "[WARN] "
+    Msg_Debug_Prefix_Common_Info<public>:string = "[INFO] "
+    Msg_Debug_Prefix_Common_Done<public>:string = "[DONE] "
 
     # Common and non-specific error messages
     Msg_Debug_General_AgentNotFound<public>:string = "An Agent was expected but not found."

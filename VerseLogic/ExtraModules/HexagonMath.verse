@@ -15,7 +15,7 @@ HexagonMath<public> := module {
         hex_coord{Q := -1, R := 0, S := 1}, hex_coord{Q := -1, R := 1, S := 0}, hex_coord{Q := 0, R := 1, S := -1}
     }
 
-    HexAddPos<public>(HexCoord:hex_coord, DirectionVector:hex_coord)<transacts>:hex_coord = {
+    HexAddPos<public>(HexCoord:hex_coord, DirectionVector:hex_coord)<computes>:hex_coord = {
         hex_coord{
             Q := HexCoord.Q + DirectionVector.Q
             R := HexCoord.R + DirectionVector.R
@@ -23,12 +23,12 @@ HexagonMath<public> := module {
         }
     }
 
-    HexNeighbour<public>(HexPos:hex_coord, Direction:int)<transacts><decides>:hex_coord = {
-        DirectionVector := HexDirectionVectors[Direction]
+    HexNeighbour<public>(HexPos:hex_coord, Direction:int)<computes>:hex_coord = {
+        DirectionVector := HexDirectionVectors[Direction] or Err("Unreachable")
         HexAddPos(HexPos, DirectionVector)
     }
 
-    HexScale<public>(HexCoord:hex_coord, Factor:int)<transacts>:hex_coord = {
+    HexScale<public>(HexCoord:hex_coord, Factor:int)<computes>:hex_coord = {
         hex_coord{
             Q := HexCoord.Q * Factor
             R := HexCoord.R * Factor
@@ -42,18 +42,17 @@ HexagonMath<public> := module {
         var ResultHexArray:[]hex_coord = array{}
 
         var CurrentHex:hex_coord = hex_coord{}
-        if (InitialHexDirectionVector := HexDirectionVectors[4]) {
-            set CurrentHex = HexAddPos(CenterHexPos, HexScale(InitialHexDirectionVector, Radius))
-        }
+
+        InitialHexDirectionVector := HexDirectionVectors[4] or Err("Unreachable")
+        set CurrentHex = HexAddPos(CenterHexPos, HexScale(InitialHexDirectionVector, Radius))
 
         for (
             I := 0..5
             J := 0..Radius - 1
         ) {
-            if (NextHex := HexNeighbour[CurrentHex, I]) {
-                set ResultHexArray += array{CurrentHex}
-                set CurrentHex = NextHex
-            }
+            NextHex := HexNeighbour(CurrentHex, I)
+            set ResultHexArray += array{CurrentHex}
+            set CurrentHex = NextHex
         }
 
         ResultHexArray
@@ -70,7 +69,7 @@ HexagonMath<public> := module {
     }
 
     # 2.0 * PiFloat / 3.0 = 120 Degrees
-    HexCoordToVector2Pos<public>(HexCoord:hex_coord, RotationAngle:float, ?IsDegrees : logic = false):vector2 = {
+    HexCoordToVector2Pos<public>(HexCoord:hex_coord, RotationAngle:float, ?IsDegrees : logic = false)<computes><reads>:vector2 = {
         AngleQ := 2.0 * PiFloat / 3.0 + if (IsDegrees?). DegreesToRadians(RotationAngle) else. RotationAngle
         AngleR := 0.0 + if (IsDegrees?). DegreesToRadians(RotationAngle) else. RotationAngle
         AngleS := 2.0 * PiFloat / 3.0 * 2.0 + if (IsDegrees?). DegreesToRadians(RotationAngle) else. RotationAngle
@@ -121,14 +120,14 @@ HexagonMath<public> := module {
         }
     }
 
-    HexCoordToGrid2D<public>(HexCoord:hex_coord)<transacts>:vector2i = {
+    HexCoordToGrid2D<public>(HexCoord:hex_coord)<computes>:vector2i = {
         vector2i{
             X := HexCoord.Q + (HexCoord.R - Floor((Mod[Abs(HexCoord.R), 2] or 0) / 2) or 0)
             Y := HexCoord.R
         }
     }
 
-    Grid2DToHexCoord<public>(GridCoord:vector2i)<transacts>:hex_coord = {
+    Grid2DToHexCoord<public>(GridCoord:vector2i)<computes>:hex_coord = {
         hex_coord{
             Q := GridCoord.X - (GridCoord.Y - Floor((Mod[Abs(GridCoord.Y), 2] or 0) / 2) or 0)
             R := GridCoord.Y

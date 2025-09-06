@@ -1,4 +1,5 @@
 using. /Fortnite.com/Devices
+using. /UnrealEngine.com/Temporary
 using. /UnrealEngine.com/Temporary/SpatialMath
 using. /Verse.org/Colors
 using. /Verse.org/Random
@@ -20,7 +21,10 @@ BGreaterThanFifty<internal>(Value:dummy_class)<transacts><decides>:void = Value.
 BGreaterThanA<internal>(Value:dummy_class)<transacts><decides>:void = Value.B > Value.A
 AEqualsToB<internal>(Value:dummy_class)<transacts><decides>:void = Value.A = Value.B
 
-modules_assert_test_device<internal> := class<final>(creative_device) {
+modules_assert_test_device<internal> := class<final>(
+    creative_device,
+    message_logger
+) {
 
     var TestID : string = ""
     var Passed : int = 0
@@ -49,7 +53,7 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
         Sleep(1.0)
         AssertBitMath()
 
-        Logger.Log_CosmeticWarning("Tests Completed - Results:\nPassed: {Passed} | Failed: {Failed} | Total: {Passed + Failed}")
+        Log_CosmeticWarning("Tests Completed - Results:\nPassed: {Passed} | Failed: {Failed} | Total: {Passed + Failed}")
     }
 
     ABC123Map : [string]int = map{
@@ -75,7 +79,7 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
     Test826Array : []int = array{8, 2, 6}
 
     AssertVerseFeatures()<suspends>:void = {
-        Logger.Log_CosmeticWarning("Asserting VerseFeatures Module")
+        Log_CosmeticWarning("Asserting VerseFeatures Module")
 
         ### Logic Utils
 
@@ -226,11 +230,11 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
         ### Sorting Operations
 
         Assert("Ascending sort of Test826Array should be 'array\{2, 6, 8\}'")
-        if (Test826Array.MergeSort(SortIntAscending) = array{2, 6, 8}). Pass()
+        if (SortBy(Test826Array, SortIntAscending) = array{2, 6, 8}). Pass()
         else. Fail()
 
         Assert("Descending sort of Test826Array should be 'array\{8, 6, 2\}'")
-        if (Test826Array.MergeSort(SortIntDescending) = array{8, 6, 2}). Pass()
+        if (SortBy(Test826Array, SortIntDescending) = array{8, 6, 2}). Pass()
         else. Fail()
 
         ### Containers
@@ -261,7 +265,7 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
     }
 
     AssertUnrealEngineFeatures()<suspends>:void = {
-        Logger.Log_CosmeticWarning("Asserting UnrealEngineFeatures Module")
+        Log_CosmeticWarning("Asserting UnrealEngineFeatures Module")
 
         Assert("Should fail when trying to get position of a bezier curve with an empty array using DeCasteljau algorithm")
         if (BezierCurves.DeCasteljau_3DV2[array{}, 0.5]). Fail()
@@ -289,7 +293,7 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
     }
 
     AssertTextLocalization()<suspends>:void = {
-        Logger.Log_CosmeticWarning("Asserting TextLocalization Module")
+        Log_CosmeticWarning("Asserting TextLocalization Module")
 
         TimeSeconds := 12345.678
 
@@ -317,7 +321,7 @@ modules_assert_test_device<internal> := class<final>(creative_device) {
     }
 
     AssertBitMath()<suspends>:void = {
-        Logger.Log_CosmeticWarning("Asserting BitMath Module")
+        Log_CosmeticWarning("Asserting BitMath Module")
 
         Assert("Bitwise And operations must provides expected values")
         if (

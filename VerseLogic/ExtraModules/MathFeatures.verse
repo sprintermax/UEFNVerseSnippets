@@ -35,6 +35,8 @@ MathFeatures<public> := module {
 
     zero_to_one_float<public> := type{_X:float where 0.0 <= _X, _X <= 1.0}
 
+    ClampZeroToOneFloat<public>(Value:float):zero_to_one_float = zero_to_one_float[Clamp(Value, 0.0, 1.0)] or Err("Unreachable")
+
     RemapValueRange<public>(FromLow:float, FromHigh:float, ToLow:float, ToHigh:float, Value:float)<computes>:float = {
         return ToLow + (Value - FromLow) * (ToHigh - ToLow) / (FromHigh - FromLow)
     }
@@ -62,7 +64,7 @@ MathFeatures<public> := module {
         return (Rounded * 1.0) / Factor
     }
 
-    TruncateFloatToString<public>(Input:float, Decimals:int)<computes><decides><reads>:[]char = {
+    TruncateFloatToString<public>(Input:float, Decimals:int)<computes><decides><reads>:string = {
         String := ToString(Input)
 
         DotIndex := String.Find['.']
@@ -70,6 +72,28 @@ MathFeatures<public> := module {
 
         return String.Slice[0, StopIndex]
     }
+
+    ToFormatedString<public>(Input:int, Separator:string)<transacts>:string = {
+        String := ToString(Abs(Input))
+        Length := String.Length
+
+        var FormatedString : string = ""
+        
+        for (Index := 1..Length, Char := String[Length - Index]) {
+            set FormatedString = "{Char}" + FormatedString
+            if (Mod[Index, 3] = 0, Index < Length). set FormatedString = Separator + FormatedString
+        }
+
+        if (Input < 0). "-{FormatedString}" else. FormatedString
+    }
+
+    ToFormatedString<public>(Input:float, IntegerSeparator:string, ?DecimalSeparator:string=".")<decides><transacts>:string = {
+        String := ToString(Input)
+        DecimalPart := String.Slice[String.Find['.'] + 1]
+        ToFormatedString(Int[Input], IntegerSeparator) + DecimalSeparator + DecimalPart
+    }
+
+
 
     ### RNGs
 
@@ -106,7 +130,7 @@ MathFeatures<public> := module {
 
     # Never needed to use this, should work but is untested
     # A more complete RNG class with more useful features
-    seedable_rng := class {
+    seedable_rng<public> := class {
         var State<private> : int = -1
         var<private> Iteration<public> : int = 0
         Multiplier<private> : int = 1664525
@@ -117,6 +141,12 @@ MathFeatures<public> := module {
         Init<public>(Seed:int)<transacts>:void = {
             set State = Seed
             set Iteration = 0
+        }
+
+        # Initializes the RNG with a random seed
+        Init<public>()<transacts>:void = {
+            RandomSeed := GetRandomInt(Constants.Min32BitInt, Constants.Max32BitInt)
+            Init(RandomSeed)
         }
 
         # Jumps to the next state
@@ -159,7 +189,7 @@ MathFeatures<public> := module {
     # Array of Elements and Weights are supposed to have the same length
     # If Strict is set to false (Default), will auto assign weight of 0 to exceding elements
     # If Strict is set to true, will force a fail if array lengths don't match.
-    (Elements:[]t).AssignChoiceWeights<public>(Weights:[]int, (?Strict:logic = false) where t:type)<transacts><decides>:[]tuple(t, int) = {
+    (Elements:[]t).AssignChoiceWeights<public>(Weights:[]int, (?Strict:logic = false) where t:type)<computes><decides>:[]tuple(t, int) = {
         Elements.Length = Weights.Length or not Strict?
 
         Choices := for (
@@ -170,7 +200,7 @@ MathFeatures<public> := module {
 
     # Returns a random element by considering priority weight over others (ChoiceData, Weight)
     # Elements with weight of 0 or negative values will never be selected
-    GetRandomByWeights<public>(Choices:[]tuple(t, int) where t:type)<transacts><decides>:t = {
+    GetRandomByWeights<public>(Choices:[]tuple(t, int) where t:type)<decides><transacts>:t = {
         var TotalWeight : int = 0
 
         for (Choice : Choices). set TotalWeight += Max(0, Choice(1))
@@ -207,17 +237,19 @@ MathFeatures<public> := module {
         Max32BitInt<public> : int = 2147483647 # Round[Pow(2.0, 31.0)] - 1 or Err("Unreachable")
         Min64BitInt<public> : int = -9223372036854775808 # Round[Pow(-2.0, 63.0)] or Err("Unreachable")
         Max64BitInt<public> : int = 9223372036854775807 # Round[Pow(2.0, 63.0)] - 1 or Err("Unreachable")
-        # Min64BitFloat<public>()<transacts>float = Pow(2.0, -1022.0)
-        # Max64BitFloat<public>()<transacts>:float = (1.0 + (Pow(2.0, 52.0) - 1.0) / Pow(2.0, 52.0)) * Pow(2.0, 1023.0)
+        # Min64BitFloat<public>()<computes><reads>:float = Pow(2.0, -1022.0)
+        # Max64BitFloat<public>()<computes><reads>:float = (1.0 + (Pow(2.0, 52.0) - 1.0) / Pow(2.0, 52.0)) * Pow(2.0, 1023.0)
         HalfPi<public>:float = PiFloat / 2.0
     }
 
     # Get a random int between Min32BitInt and Max32BitInt
-    GetRandomInt<public>():int = GetRandomInt(Constants.Min32BitInt, Constants.Max32BitInt)
+    GetRandomInt<public>()<transacts>:int = GetRandomInt(Constants.Min32BitInt, Constants.Max32BitInt)
 
     # Get a random float between Min32BitInt and Max32BitInt
     # Verse has 64bit floats, but I avoid using that full range due to some issues explained above
-    GetRandomFloat<public>():float = GetRandomFloat(Constants.Min32BitInt * 1.0, Constants.Max32BitInt * 1.0)
+    GetRandomFloat<public>()<transacts>:float = GetRandomFloat(Constants.Min32BitInt * 1.0, Constants.Max32BitInt * 1.0)
+
+
 
     EasingFunctions<public> := module {
 
@@ -489,12 +521,12 @@ MathFeatures<public> := module {
     }
 
     # Rotate a point in 3D space around an anchor point on a specific axis
-    (Point:vector3).RotateAroundAnchor<public>(Anchor:vector3, Axis:vector3, AngleRadians:float)<transacts>:vector3 = {
+    (Point:vector3).RotateAroundAnchor<public>(Anchor:vector3, Axis:vector3, AngleRadians:float)<computes><reads>:vector3 = {
         MakeRotation(Axis, AngleRadians).RotateVector(Point - Anchor) + Anchor
     }
 
     # Rotate a point in 2D space around an anchor point
-    (Point:vector2).RotateAroundAnchor<public>(Anchor:vector2, AngleRadians:float)<transacts>:vector2 = {
+    (Point:vector2).RotateAroundAnchor<public>(Anchor:vector2, AngleRadians:float)<computes><reads>:vector2 = {
         Anchor3 := Anchor.ToVector3()
         (MakeRotation(vector3{Z := 1.0}, AngleRadians).RotateVector(Point.ToVector3() - Anchor3) + Anchor3).ToVector2()
     }

@@ -1,16 +1,18 @@
 using. /Verse.org/Simulation
 
 TextLocalization<public> := module {
-    ### Generic conversion methods
+    ### Generic direct conversion methods
+    StringFromMessage<public>(Message:message):string = Localize(Message)
+
     MessageFromAgent<public><localizes>(Agent:agent):message = "{Agent}"
-    MessageFromPlayer<public><localizes>(Player:player):message = "{Player}"
     MessageFromString<public><localizes>(String:string):message = "{String}"
     MessageFromInt<public><localizes>(Value:int):message = "{Value}"
     MessageFromFloat<public><localizes>(Value:float):message = "{Value}"
 
     ### Common and Placeholder localization texts
-    Loc_Common_EmptyMessage<public><localizes>:message = "​" # Uses Zero Width Space to avoid auto localization breaking
-    Loc_Common_SingleSpace<public><localizes>:message = "​ " # Uses Zero Width Space to avoid auto localization breaking
+    Loc_Common_EmptyMessage<public><localizes>:message = "​" # NOTE: Uses Zero Width Space to avoid auto localization breaking
+    Loc_Common_SingleSpace<public><localizes>:message = "​ " # NOTE: Uses Zero Width Space to avoid auto localization breaking
+    Loc_Common_None<public><localizes>:message = "None"
     Loc_Common_Unknown<public><localizes>:message = "Unknown"
     Loc_Common_Missing<public><localizes>:message = "Missing"
     Loc_Common_Unavailable<public><localizes>:message = "Unavailable"
@@ -18,7 +20,7 @@ TextLocalization<public> := module {
     Loc_Common_Placeholder_Short<public><localizes>:message = "[PH]"
     Loc_Common_Placeholder_Soon<public><localizes>:message = "Soon"
     Loc_Common_Placeholder_ComingSoon<public><localizes>:message = "Coming Soon"
-    Loc_Common_NewLine<public><localizes>:message = "​\n" # Uses Zero Width Space to avoid auto localization breaking
+    Loc_Common_NewLine<public><localizes>:message = "​\n" # NOTE: Uses Zero Width Space to avoid auto localization breaking
 
     ### Generic localization Texts
     Loc_Common_Number_0<public><localizes> : message = "0"
@@ -32,12 +34,18 @@ TextLocalization<public> := module {
     Loc_Common_Number_8<public><localizes> : message = "8"
     Loc_Common_Number_9<public><localizes> : message = "9"
 
+    Loc_Common_Interrogation<public><localizes>:message = "?"
+    Loc_Common_Interrogation3<public><localizes>:message = "???"
+    Loc_Common_Exclamation<public><localizes>:message = "!"
+
     ### User Interface messages
     Loc_Action_Close<public><localizes>:message = "Close"
     Loc_Action_CloseMenu<public><localizes>:message = "Close Menu"
+    Loc_Action_CloseX<public><localizes>:message = "✖"
     Loc_Action_Back<public><localizes>:message = "Back"
     Loc_Action_Delete<public><localizes>:message = "Delete"
     Loc_Action_Clear<public><localizes>:message = "Clear"
+    Loc_Action_Unknown<public><localizes>:message = "Unknown Action"
 
     Loc_Action_Previous<public><localizes>:message = "Previous"
     Loc_Action_PreviousPage<public><localizes>:message = "Previous Page"
@@ -62,6 +70,10 @@ TextLocalization<public> := module {
     Loc_Info_AlreadyPurchased<public><localizes>:message = "Already Purchased"
     Loc_Info_Equipped<public><localizes>:message = "EQUIPPED"
     Loc_Info_AlreadyEquipped<public><localizes>:message = "Already Equipped"
+    Loc_Info_Locked<public><localizes>:message = "LOCKED"
+    Loc_Info_Unlocked<public><localizes>:message = "UNLOCKED"
+    Loc_Info_Locked_Icon<public><localizes>:message = "🔒"
+    Loc_Info_Unlocked_Icon<public><localizes>:message = "🔓"
 
     Loc_Action_Get<public><localizes>:message = "Get"
     Loc_Action_Purchase<public><localizes>:message = "Purchase"
@@ -90,10 +102,68 @@ TextLocalization<public> := module {
     Loc_Inventory_NoItemAvailable<public><localizes>:message = "NO ITEM AVAILABLE"
     Loc_Inventory_NothingAvailable<public><localizes>:message = "NOTHING AVAILABLE"
 
+    ### Leaderboard Messages
+
+    Loc_Leaderboard_PlayerPlacementScore<public><localizes>(Placement:int, Agent:agent, Score:int):message = "{Placement} - {Agent}: {Score}"
+    Loc_Leaderboard_PlayerDisplay<public><localizes>(Placement:int, Player:agent):message = "#{Placement} {Player}\n"
+    Loc_Leaderboard_PlayerDisplay<public><localizes>(Player:agent):message = "{Player}\n"
+    Loc_Leaderboard_ScoreDisplay<public><localizes>(Score:int):message = "{Score}\n"
+
+    ### Scoring Messages
+
+    Loc_Scoring_PlayerScore<public><localizes>(Player:agent, Score:int):message = "{Player}: {Score}"
+
+    Loc_Scoring_UnknownPersonalBest<public><localizes>:message = "Personal Best: ???"
+    Loc_Scoring_PersonalBest<public><localizes>(Score:int):message = "Personal Best: {Score}"
+    Loc_Scoring_HighScore<public><localizes>(Score:int) : message = "Highscore: {Score}"
+    Loc_Scoring_SessionBest<public><localizes>(Score:int) : message = "Session Best: {Score}"
+    Loc_Scoring_SessionHighScore<public><localizes>(Score:int) : message = "Session Highscore: {Score}"
+
+    ### Game Events
+    Loc_GameEvent_GetReady<public><localizes>(Time:int):message = "Get Ready... {Time}"
+    Loc_GameEvent_GameOver<public><localizes>:message = "GAME OVER!"
+
+    Loc_GameEvent_GameOver_Scored<public><localizes>(Score:int):message = "GAME OVER!\nScore: {Score}"
+    Loc_GameEvent_NewHighScore<public><localizes>(Score:int):message = "NEW HIGH SCORE!\nScore: {Score}"
+
+    ### Statistics
+    Loc_FloatStatistic_Unknown<public><localizes>:message = "Unknown Float Statistic"
+    Loc_IntegerStatistic_Unknown<public><localizes>:message = "Unknown Integer Statistic"
+
+    Loc_FloatStatistic_FirstTimePlayed_Name<public><localizes>:message = "First Time Played"
+    Loc_FloatStatistic_TotalTimePlayed_Name<public><localizes>:message = "Total Time Played"
+    Loc_FloatStatistic_LastDailyRewardClaimed_Name<public><localizes>:message = "Last Daily Reward Claimed"
+    Loc_FloatStatistic_ExperiencePoints_Name<public><localizes>:message = "Experience Points"
+
+    Loc_IntegerStatistic_TotalDailyRewardsClaimed_Name<public><localizes>:message = "Daily Rewards Claimed"
+
     ### Currencies
     Loc_Currency_NotEnough<public><localizes>:message = "NOT ENOUGH"
 
-    Loc_Currency_ExperiencePoints_Name<public><localizes>:message = "Experience Points"
+    Loc_Currency_Unknown<public><localizes>:message = "Unknown Currency"
+
+    Loc_Currency_Coins_Name<public><localizes>:message = "Coins"
+    Loc_Currency_Stars_Name<public><localizes>:message = "Stars"
+
+    ### Achievements
+    Loc_Achievement_Unknown<public><localizes>:message = "Unknown Achievement"
+
+    Loc_Achivement_PlayedFor10Days_Title<public><localizes>:message = "Dedicated"
+    Loc_Achivement_PlayedFor10Days_Description<public><localizes>:message = "Played for 10 days in total"
+
+    ### Cosmetics
+    Loc_Cosmetic_Unknown<public><localizes>:message = "Unknown Cosmetic"
+
+    ### Permission Tags
+    Loc_PermissionTag_Unknown<public><localizes>:message = "Unknown Permission"
+
+    Loc_PermissionTag_TestPlayer_Name<public><localizes>:message = "Test Player"
+    Loc_PermissionTag_Player_Name<public><localizes>:message = "Player"
+    Loc_PermissionTag_BetaTester_Name<public><localizes>:message = "Beta Tester"
+    Loc_PermissionTag_ContentCreator_Name<public><localizes>:message = "Content Creator"
+    Loc_PermissionTag_Moderator_Name<public><localizes>:message = "Moderator"
+    Loc_PermissionTag_Admin_Name<public><localizes>:message = "Admin"
+    Loc_PermissionTag_Developer_Name<public><localizes>:message = "Developer"
 
     ### Date and Time
     Loc_Time_ClockFormat<public>(Seconds:float, ?DisplayMiliseconds:logic = false)<transacts>:string = {
@@ -129,6 +199,40 @@ TextLocalization<public> := module {
         
         TimeString
     }
+
+    # Temp quick solution, will work on a better clock text formatting function in the future
+    Loc_Time_ClockFormat2<public>(Seconds:float, ?DisplaySeconds:logic = true, ?DisplayMiliseconds:logic = false)<transacts>:string = {
+        var TimeString : string = "?h ?m ?s"
+        if (
+            AbsSeconds := Abs(Seconds)
+            ClampedSeconds := Floor[AbsSeconds]
+            TimeSeconds := Mod[ClampedSeconds, 60]
+            TimeMinutesTotal := Floor(ClampedSeconds / 60)
+            TimeMinutes := Mod[Floor(ClampedSeconds / 60), 60]
+            TimeHours := Floor(TimeMinutesTotal / 60)
+        ) {
+            if (Seconds < 0.0). set TimeString = "-"
+            else. set TimeString = ""
+
+            set TimeString += "{TimeHours}h "
+            set TimeString += "{TimeMinutes}m"
+
+            if (DisplaySeconds?). set TimeString += " {TimeSeconds}s"
+
+            if (DisplayMiliseconds?) {
+                TimeMiliseconds := Round[(AbsSeconds - ClampedSeconds * 1.0) * 1000] or 0
+
+                set TimeString += " {TimeMiliseconds}ms"
+            }
+        }
+        
+        TimeString
+    }
+
+    ### Creative Device Messages
+
+    Loc_DeviceCategory_CoreDevices<public><localizes>:message = "Core Devices"
+    Loc_DeviceCategory_CreativeAssets<public><localizes>:message = "Creative Assets"
 
     ### Debug translation messages
 

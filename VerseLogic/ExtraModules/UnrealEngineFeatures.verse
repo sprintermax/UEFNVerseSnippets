@@ -60,7 +60,7 @@ UnrealEngineFeatures<public> := module {
 
     BezierCurves<public> := module {
 
-        QuadraticBezierPoint<public>(Start:vector2, Control:vector2, End:vector2, Alpha:float) : vector2 = {
+        QuadraticBezierPoint<public>(Start:vector2, Control:vector2, End:vector2, Alpha:float)<computes><reads>:vector2 = {
             ControlPoint := vector2{
                 X := Control.X + (1.0 - Alpha) * (Start.X - Control.X) + Alpha * (End.X - Control.X)
                 Y := Control.Y + (1.0 - Alpha) * (Start.Y - Control.Y) + Alpha * (End.Y - Control.Y)
@@ -77,7 +77,7 @@ UnrealEngineFeatures<public> := module {
             }
         }
 
-        QuadraticBezierPoint<public>(Start:vector3, Control:vector3, End:vector3, Alpha:float) : vector3 = {
+        QuadraticBezierPoint<public>(Start:vector3, Control:vector3, End:vector3, Alpha:float)<computes><reads>:vector3 = {
             ControlPoint := vector3{
                 X := Control.X + (1.0 - Alpha) * (Start.X - Control.X) + Alpha * (End.X - Control.X)
                 Y := Control.Y + (1.0 - Alpha) * (Start.Y - Control.Y) + Alpha * (End.Y - Control.Y)
@@ -93,17 +93,17 @@ UnrealEngineFeatures<public> := module {
 
         # 3D Bezier
 
-        bezier_3D<public> := class {
+        bezier_3D<public> := class<computes> {
             Start<public>:vector3
             Mid<public>:vector3
             End<public>:vector3
         }
 
-        EvaluatePoints_Bezier_3D<public>(Points:[]vector3, Position:float)<transacts><decides>:tuple(vector3, [][]bezier_3D) = {
+        EvaluatePoints_Bezier_3D<public>(Points:[]vector3, Position:float)<decides><transacts>:tuple(vector3, [][]bezier_3D) = {
             Evaluate_Bezier_3D[MakeBezierLines_3D(Points), Position]
         }
 
-        Evaluate_Bezier_3D<public>(BezierLines:[]bezier_3D, Position:float)<transacts><decides>:tuple(vector3, [][]bezier_3D) = {
+        Evaluate_Bezier_3D<public>(BezierLines:[]bezier_3D, Position:float)<decides><transacts>:tuple(vector3, [][]bezier_3D) = {
             var CurrentCurveLines : []bezier_3D = GetChildBezierLines_3D(BezierLines, Position)
             var PastBezierLines : [][]bezier_3D = array{ BezierLines, CurrentCurveLines }
 
@@ -116,7 +116,7 @@ UnrealEngineFeatures<public> := module {
             (CurrentCurveLines[0].Mid, PastBezierLines)
         }
 
-        MakeBezierLines_3D<public>(Points:[]vector3)<transacts>:[]bezier_3D = {
+        MakeBezierLines_3D<public>(Points:[]vector3)<computes>:[]bezier_3D = {
             for (Point : Points). bezier_3D{
                 Start := Point
                 End := Point
@@ -124,7 +124,7 @@ UnrealEngineFeatures<public> := module {
             }
         }
 
-        GetChildBezierLines_3D<public>(Points:[]bezier_3D, Position:float)<transacts>:[]bezier_3D = {
+        GetChildBezierLines_3D<public>(Points:[]bezier_3D, Position:float)<computes>:[]bezier_3D = {
             for (
                 Index := 0..Points.Length - 2
                 PointA := Points[Index].Mid
@@ -144,17 +144,17 @@ UnrealEngineFeatures<public> := module {
 
         # 2D Bezier
 
-        bezier_2D<public> := class {
+        bezier_2D<public> := class<computes> {
             Start<public>:vector2
             Mid<public>:vector2
             End<public>:vector2
         }
 
-        EvaluatePoints_Bezier_2D<public>(Points:[]vector2, Position:float)<transacts><decides>:tuple(vector2, [][]bezier_2D) = {
+        EvaluatePoints_Bezier_2D<public>(Points:[]vector2, Position:float)<decides><transacts>:tuple(vector2, [][]bezier_2D) = {
             Evaluate_Bezier_2D[MakeBezierLines_2D(Points), Position]
         }
 
-        Evaluate_Bezier_2D<public>(BezierLines:[]bezier_2D, Position:float)<transacts><decides>:tuple(vector2, [][]bezier_2D) = {
+        Evaluate_Bezier_2D<public>(BezierLines:[]bezier_2D, Position:float)<decides><transacts>:tuple(vector2, [][]bezier_2D) = {
             var CurrentCurveLines : []bezier_2D = GetChildBezierLines_2D(BezierLines, Position)
             var PastBezierLines : [][]bezier_2D = array{ BezierLines, CurrentCurveLines }
 
@@ -167,7 +167,7 @@ UnrealEngineFeatures<public> := module {
             (CurrentCurveLines[0].Mid, PastBezierLines)
         }
 
-        MakeBezierLines_2D<public>(Points:[]vector2)<transacts>:[]bezier_2D = {
+        MakeBezierLines_2D<public>(Points:[]vector2)<computes>:[]bezier_2D = {
             for (Point : Points). bezier_2D{
                 Start := Point
                 End := Point
@@ -175,7 +175,7 @@ UnrealEngineFeatures<public> := module {
             }
         }
 
-        GetChildBezierLines_2D<public>(Points:[]bezier_2D, Position:float)<transacts>:[]bezier_2D = {
+        GetChildBezierLines_2D<public>(Points:[]bezier_2D, Position:float)<computes>:[]bezier_2D = {
             for (
                 Index := 0..Points.Length - 2
                 PointA := Points[Index].Mid
@@ -192,7 +192,7 @@ UnrealEngineFeatures<public> := module {
             }
         }
 
-        DeCasteljau_3DV2<public>(Points:[]vector3, Position:float)<transacts><decides>:vector3 = {
+        DeCasteljau_3DV2<public>(Points:[]vector3, Position:float)<decides><transacts>:vector3 = {
             var Midpoints : []vector3 = Points
 
             loop {

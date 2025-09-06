@@ -2,7 +2,7 @@ using. /Verse.org/Random
 using. /Verse.org/Simulation
 
 using. PersistablePlayerData
-using. VerseFeatures
+using. ExtraModules.VerseFeatures
 
 SessionPlayerData<public> := module {
 
