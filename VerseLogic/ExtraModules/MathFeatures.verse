@@ -35,7 +35,7 @@ MathFeatures<public> := module {
 
     zero_to_one_float<public> := type{_X:float where 0.0 <= _X, _X <= 1.0}
 
-    ClampZeroToOneFloat<public>(Value:float):zero_to_one_float = zero_to_one_float[Clamp(Value, 0.0, 1.0)] or Err("Unreachable")
+    ClampZeroToOneFloat<public>(Value:float)<computes>:zero_to_one_float = zero_to_one_float[Clamp(Value, 0.0, 1.0)] or Err("Unreachable")
 
     RemapValueRange<public>(FromLow:float, FromHigh:float, ToLow:float, ToHigh:float, Value:float)<computes>:float = {
         return ToLow + (Value - FromLow) * (ToHigh - ToLow) / (FromHigh - FromLow)
