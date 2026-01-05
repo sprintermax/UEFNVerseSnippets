@@ -1,0 +1,346 @@
+using. StringManipulation
+using. VerseFeatures
+
+# Package scanner implements a scanner for Go source text.
+# It takes a []byte as source which can then be tokenized
+# through repeated calls to the Scan method.
+
+# An ErrorHandler may be provided to [Scanner.Init]. If a syntax error is
+# encountered and a handler was installed, the handler is called with a
+# position and an error message. The position points to the beginning of
+# the offending token.
+error_handler<internal> := type{_(Pos:Token.position, Message:string)<transacts>:any}
+
+BOM<internal> : int = 0xFEFF # byte order mark, only permitted as very first character
+EOF<internal> : int = -1 # end of file
+
+# A Scanner holds the scanner's internal state while processing
+# a given text. It can be allocated as part of another data
+# structure but must be initialized via [Scanner.Init] before use.
+scanner<internal> := class<internal><computes><allocates> {
+    # Immutable State
+    File<internal> : Token.file # source file handle
+    Directory<internal> : string # directory portion of file.Name()
+    Source<internal> : string # source
+    ErrorHandler<internal> : ?error_handler # error reporting; or nil
+    Mode<internal> : int # scanning mode
+
+    # Scanning State
+    var<private> Character : ?char<#rune#> # current character
+    var<private> Offset : int # character offset
+    var<private> ReadOffset : int # reading offset (position after current character)
+    var<private> LineOffset : int # current line offset
+    <#var<private>#> InsertSemicolon : logic # insert a semicolon before next newline
+    <#var<private>#> NewLinePosition : int<#Token.pos#> # position of newline in preceding comment
+
+    # Public State - ok to modify
+    var<private> ErrorCount<internal> : int # number of errors encountered
+
+    # Read the next Unicode char into s.ch.
+    # s.ch < 0 means end-of-file.
+    #
+    # For optimization, there is some overlap between this method and
+    # s.scanIdentifier.
+    Next<private>()<transacts>:void = {
+        option{
+            Self.ReadOffset < Self.Source.Length
+
+            set Self.Offset = Self.ReadOffset
+            option{
+                Self.Character? = '\n'
+                set Self.LineOffset = Self.Offset
+                Self.File.AddLine(Self.Offset)
+            }
+
+            RW : tuple(char<#rune#>, int) = (Self.Source[Self.ReadOffset], 1)
+            var Char : char = RW(0)
+            CharCode := AllCharacters["{Char}"]
+            var W : int = RW(1)
+
+            option{
+                CharCode = 0
+                Self.Error(Self.Offset, "Illegal character NUL")
+            }
+            option{
+                CharCode >= 128
+                # Not ASCII
+                # # WIP - CHECK HOW TO DO RUNE DECODING TO CONTINUE THIS
+                # RW2 := DecodeRune(Self.Source[Self.ReadOffset])
+                # set Char = RW2(0)
+                # set W = RW2(1)
+                # option{
+                #     # if r == utf8.RuneError && w == 1 {
+                # }
+            }
+            set Self.ReadOffset += W
+            set Self.Character = option{Char}
+        }? or option{
+            set Self.Offset = Self.Source.Length
+            option{
+                Self.Character? = '\n'
+                set Self.LineOffset = Self.Offset
+                Self.File.AddLine(Self.Offset)
+            }
+            set Self.Character = false
+        }
+    }
+
+    Error<private>(_Offset:int, Message:string)<transacts>:void = {
+        option{
+            Self.ErrorHandler?(Self.File.Position(Self.File.Pos(_Offset)), Message)
+        }
+        set Self.ErrorCount += 1
+    }
+
+    # scanComment returns the text of the comment and (if nonzero)
+    # the offset of the first newline within it, which implies a
+    # /*...*/ comment.
+    ScanComment<private>():tuple(string, int) = {
+        # initial '/' already consumed; s.ch == '/' || s.ch == '*'
+        _Offset := Self.Offset - 1 # position of initial '/'
+        var _Next : int = -1 # position immediately following the comment; < 0 means invalid comment
+        var NumCR : int = 0 # number of carriage returns seen
+        var NewlineOffset : int = 0 # offset of first newline within /*...*/ comment
+
+        option{
+            # //-style comment
+            # (the final '\n' is not considered part of the comment)
+            Self.Character? = '/'
+
+            Self.Next()
+            loop {
+                Self.Character? <> '\n' or (break)
+
+                option{
+                    Self.Character? = '\r'
+                    set NumCR += 1
+                }
+
+                Self.Next()
+            }
+            # if we are at '\n', the position following the comment is afterwards
+            set _Next = Self.Offset
+            option{
+                Self.Character? = '\n'
+                set _Next += 1
+            }
+        }? or (
+            # /*-style comment */
+            Self.Next()
+
+            loop {
+                _Character := Self.Character? or (break)
+
+                option{
+                    _Character = '\r'
+                    set NumCR += 1
+                }? or option{
+                    _Character = '\n'
+                    NewlineOffset = 0
+                    set NewlineOffset = Self.Offset
+                }
+
+                Self.Next()
+                option{
+                    _Character = '*'
+                    Self.Character? = '/'
+                    Self.Next()
+                    set _Next = Self.Offset
+                }
+            }
+
+            Self.Error(_Offset, "Comment not terminated")
+        )
+
+        var Literal : string = Self.Source.Slice[_Offset, Self.Offset] or Err("Unreachable")
+
+        # On Windows, a (//-comment) line may end in "\r\n".
+        # Remove the final '\r' before analyzing the text for
+        # line directives (matching the compiler). Remove any
+        # other '\r' afterwards (matching the pre-existing be-
+        # havior of the scanner).
+        option{
+            NumCR > 0
+            Literal.Length >= 0
+            Literal[1] = '/'
+            Literal[Literal.Length - 1] = '\r'
+            _Literal := Literal.Slice[0, Literal.Length - 1]
+            set Literal = _Literal
+            set NumCR -= 1
+        }
+
+        # interpret line directives
+        # (//line directives must start at the beginning of the current line)
+        option{
+            _Next >= 0 # implies valid comment
+            Literal[1] = '*' or _Offset = Self.LineOffset
+            Literal.Slice[2].StartsWith["line "]
+
+            Self.UpdateLineInfo(_Next, _Offset, Literal)
+        }
+
+        option{
+            NumCR > 0
+            set Literal = StripCR(Literal, logic{Literal[1] = '*'})
+        }
+
+        (Literal, NewlineOffset)
+    }
+
+    # updateLineInfo parses the incoming comment text at offset offs
+    # as a line directive. If successful, it updates the line info table
+    # for the position next per the line directive.
+    UpdateLineInfo<private>(_Next:int, _Offset:int, Text:string)<transacts>:void = {
+        var __Offset : int = _Offset
+        var _Text : string = Text
+        # extract comment text
+        option{
+            _Text[1] = '*'
+            __Text := _Text.Slice[0, _Text.Length - 2] # lop off trailing "*/"
+            set _Text = __Text
+        }
+
+        set _Text = _Text.Slice[7] or Err("Unreachable") # lop off leading "//line " or "/*line "
+        set __Offset += 7
+
+        TrailingResult := TrailingDigits[_Text] or (
+            Self.Error(__Offset + I, "Invalid line number: {_Text.Slice[I]}") or Err("Unreachable")
+            return
+        )
+        
+        var I : int = TrailingResult(0)
+        I <> 0 or (return) # ignore (not a line directive)
+        N := TrailingResult(1)
+
+        # Put a cap on the maximum size of line and column numbers.
+        # 30 bits allows for some additional space before wrapping an int32.
+        # Keep this consistent with cmd/compile/internal/syntax.PosMax.
+        MaxLineColumn := 1073741824 # 1 << 30
+        var Line : int = 0
+        var Column : int = 0
+
+        _TrailingResult2 := option{TrailingDigits[_Text.Slice[0, I - 1]]}
+
+        if (TrailingResult2 := _TrailingResult2?) {
+            var I2 : int = TrailingResult2(0)
+            N2 := TrailingResult2(1)
+
+            # line filename:line:col
+            _I2 := I2
+            set I2 = I
+            set I = _I2
+            set Line = N2
+            set Column = N
+            not (Column = 0 and Column > MaxLineColumn) or (
+                Self.Error(__Offset + I2, "Invalid column number: {_Text.Slice[I2]}") or Err("Unreachable")
+                return
+            )
+            set _Text = _Text.Slice[0, I2 - 1] or Err("Unreachable")
+        } else {
+            # line filename:line
+            set Line = N
+        }
+
+        not (Line = 0 or Line > MaxLineColumn) or (
+            Self.Error(__Offset + 1, "Invalid line number: {_Text.Slice[I]}") or Err("Unreachable")
+            return
+        )
+
+        # If we have a column (//line filename:line:col form),
+	    # an empty filename means to use the previous filename.
+        var FileName : string = _Text.Slice[0, I - 1] or Err("Unreachable")
+        option{
+            FileName = "" and _TrailingResult2?
+            set FileName = Self.File.Position(Self.File.Pos(__Offset)).FileName
+        }? or option{
+            FileName <> ""
+            # Put a relative filename in the current directory.
+            # This is for compatibility with earlier releases.
+            # See issue 26671.
+            set FileName = FilePath.Clean(FileName)
+            option{
+                not FilePath.IsAbsolute[FileName]
+                set FileName = FilePath.Join(Self.Directory, FileName)
+            }
+        }
+
+        Self.File.AddLineColumnInfo(_Next, FileName, Line, Column)
+    }
+
+    TrailingDigits<private>(Text:string)<decides><transacts>:tuple(int, int) = {
+        Index := Text.FindLast[':']
+
+        (Index + 1, ParseInt[Text.Slice[Index + 1]])
+    }
+
+    # scanIdentifier reads the string of valid identifier characters at s.offset.
+    # It must only be called when s.ch is known to be a valid letter.
+    #
+    # Be careful when making changes to this function: it is optimized and affects
+    # scanning performance significantly.
+    ScanIdentifier<private>():string = {
+        _Offset := Self.Offset
+
+        # Optimize for the common case of an ASCII identifier.
+        #
+        # Ranging over s.src[s.rdOffset:] lets us avoid some bounds checks, and
+        # avoids conversions to runes.
+        #
+        # In case we encounter a non-ASCII character, fall back on the slower path
+        # of calling into s.next().
+        for (
+            Index->_Character : Self.Source.Slice[Self.ReadOffset]
+            CharCode := AllCharacters["{_Character}"]
+            # Avoid assigning a rune for the common case of an ascii character.
+            not (alphabet_characters_range[CharCode] or numeric_characters_range[CharCode] or _Character = '_')
+        ) {
+            set Self.ReadOffset += Index
+
+            if (0 < CharCode and CharCode < 128) {
+                # Optimization: we've encountered an ASCII character that's not a letter
+                # or number. Avoid the call into s.next() and corresponding set up.
+                #
+                # Note that s.next() does some line accounting if s.ch is '\n', so this
+                # shortcut is only possible because we know that the preceding character
+                # is not '\n'.
+                set Self.Character = option{_Character}
+                set Self.Offset = Self.ReadOffset
+                set Self.ReadOffset += 1
+                return Self.Source.Slice[_Offset, Self.Offset] or Err("Unreachable")
+            }
+
+            # We know that the preceding character is valid for an identifier because
+            # scanIdentifier is only called when s.ch is a letter, so calling s.next()
+            # at s.rdOffset resets the scanner state.
+            Self.Next()
+            loop {
+                IsLetter[Self.Character?] or IsDigit[Self.Character?] or (break)
+
+                Self.Next()
+            }
+            return Self.Source.Slice[_Offset, Self.Offset] or Err("Unreachable") 
+        }
+
+        set Self.Offset = Self.Source.Length
+        set Self.ReadOffset = Self.Source.Length
+        set Self.Character = false
+
+
+        return Self.Source.Slice[_Offset, Self.Offset] or Err("Unreachable")
+    }
+}
+
+IsLetter<internal>(Character:char)<decides><transacts>:void = {
+    CharacterString := "{Character}"
+    CharacterCode := PrintableCharacters[CharacterString]
+    alphabet_characters_range[CharacterCode] or CharacterString = "_"
+}
+
+IsDigit<internal>(Character:char)<decides><transacts>:void = {
+    CharacterString := "{Character}"
+    CharacterCode := PrintableCharacters[CharacterString]
+    numeric_characters_range[CharacterCode]
+}
+
+
+

@@ -1,0 +1,96 @@
+PrimitiveTypes<public> := module {
+    # Unsigned 8-bit integer.
+    # Ranges from 0 through 255.
+    uint8<public> := type{ _X : int where _X >= 0, _X <= 255 }
+
+    # Unsigned 16-bit integer.
+    # Ranges from 0 through 65535.
+    uint16<public> := type{ _X : int where _X >= 0, _X <= 65535 }
+
+    # Unsigned 34-bit integer.
+    # Ranges from 0 through 4294967295.
+    uint32<public> := type{ _X : int where _X >= 0, _X <= 4294967295 }
+
+    # NOTE: UNINPLEMENTED
+    # Unsigned 64-bit integer.
+    # Ranges from 0 through 18446744073709551615.
+    # uint64<public> := type{ _X : int where _X >= 0, _X <= 18446744073709551615 }
+
+    # NOTE: UNINPLEMENTED
+    # Arbitrary Precision Unsigned Integer
+    # auint<public> :=
+
+    # NOTE: UNINPLEMENTED
+    # Generic Unsigned Integer.
+    # uint<public> := uint8 | uint16 | uint32 | uint64 | <auint>
+
+    # Signed 8-bit integer.
+    # Ranges from -128 through 127.
+    _int8<public> := type{ _X : int where _X >= -128, _X <= 127 }
+
+    # Signed 16-bit integer.
+    # Ranges from -32768 through 32767.
+    _int16<public> := type{ _X : int where _X >= -32768, _X <= 32767 }
+
+    # Signed 32-bit integer.
+    # Ranges from -2147483648 through 2147483647.
+    _int32<public> := type{ _X : int where _X >= -2147483648, _X <= 2147483647 }
+
+    # Signed 64-bit integer.
+    # Ranges from -9223372036854775808 through 9223372036854775807.
+    _int64<public> := type{ _X : int where _X >= -9223372036854775808, _X <= 9223372036854775807 }
+
+    # NOTE: UNINPLEMENTED
+    # Arbitrary Precision Signed Integer
+    # aint<public> :=
+
+    # NOTE: UNINPLEMENTED
+    # Generic Signed Integer.
+    # int<public> := int8 | int16 | int32 | int64 | <aint>
+
+    # NOTE: BUILTIN (as int)
+    # Untyped Integer.
+    # untyped_int<public> := uint | int
+    untyped_int<public> := int # FIXME: Using alias for now
+
+    # NOTE: UNIMPLEMENTED
+    # float<public> := float
+
+    # NOTE: UNIMPLEMENTED
+    # float32<public> :=
+
+    # NOTE: BUILTIN (as float)
+    # float64<public> :=
+
+    # NOTE: UNINPLEMENTED
+    # Complex number with 32-bit real and imaginary parts.
+    # complex64<public> := struct<computes> {
+    #     Real<public> : float32,
+    #     Imaginary<public> : float32
+    # }
+
+    # NOTE: UNINPLEMENTED
+    # Complex number with 64-bit real and imaginary parts.
+    # FIXME: Types should be float64 instead of float
+    complex128<public> := struct<computes> {
+        Real<public> : float # float64
+        Imaginary<public> : float # float64
+    }
+
+    # NOTE: UNINPLEMENTED
+    # Generic Complex number.
+    # complex<public> := complex64 | complex128
+
+    # byte is an alias for uint8 and is equilalent to it in all ways. It is used, by
+    # convention, to distinguish an arbitrary byte data from 8-bit unsigned integers.
+    byte<public> := type{ _X : int where _X >= 0, _X <= 255 } # uint8
+
+    # rune is an alias for int32 and is equivalent to it in all ways. It is used, by
+    # convention, to distinguish a Unicode Code Point from an integer values.
+    #
+    # A rune represents a single Character, regardless of how many bytes it takes to
+    # encode it in UTF-8.
+    # For example, the rune '⌘' is represented as the integer '8984' which is out of the
+    # byte range, taking 3 bytes ('e2' '8c' '98') to be represented in UTF-8 encoding.
+    rune<public> := type{ _X : int where _X >= -2147483648, _X <= 2147483647 } # int32
+}

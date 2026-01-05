@@ -1,0 +1,158 @@
+using. VerseFeatures
+
+MakeLexer<public>(Input:string)<transacts>:lexer = {
+    Lexer := lexer{ Input := Input }
+
+    Lexer.ReadCharacter()
+
+    Lexer
+}
+
+# <computes><allocates>
+lexer<public> := class<internal><transacts> {
+    Input<public> : string
+    var<private> CurrentPosition<private> : int = 0 # ReadPos
+    var<private> _CurrentCharacter<private> : ?string = false # Was supposed to be Char/Byte
+
+    NextToken<internal>()<transacts>:token = {
+        Self.SkipWhitespace()
+
+        Token := if (CurrentCharacter := _CurrentCharacter?) {
+            if (CurrentCharacter = "=") {
+                if (Self.PeekCharacter() = "=") {
+                    Self.ReadCharacter()
+                    token{
+                        Literal := CurrentCharacter + Self._CurrentCharacter? or Err("Unreachable")
+                        Type := "EQUAL"
+                    }
+                } else {
+                    token{
+                        Literal := CurrentCharacter
+                        Type := "ASSIGN"
+                    }
+                }
+            } else if (CurrentCharacter = "!") {
+                if (Self.PeekCharacter() = "=") {
+                    Self.ReadCharacter()
+                    token{
+                        Literal := CurrentCharacter + Self._CurrentCharacter? or Err("Unreachable")
+                        Type := "NOT_EQUAL"
+                    }
+                } else {
+                    token{
+                        Literal := CurrentCharacter
+                        Type := "NEGATE"
+                    }
+                }
+            } else if (CurrentCharacter = "\"") {
+                token{
+                    Literal := Self.ReadString()
+                    Type := "STRING"
+                }
+            } else if (TokenType := BuiltInTokens.FindKeyByValue[CurrentCharacter]) {
+                token{
+                    Literal := CurrentCharacter
+                    Type := TokenType
+                }
+            } else if (Self.IsLetter[]) {
+                TokenLiteral := Self.ReadIdentifier()
+                TokenType := LookupIdentifier(TokenLiteral)
+                return token{
+                    Literal := TokenLiteral
+                    Type := TokenType
+                }
+            } else if(Self.IsDigit[]) {
+                return token{
+                    Literal := Self.ReadNumber()
+                    Type := "INTEGER"
+                }
+            } else {
+                token{
+                    Literal := CurrentCharacter
+                    Type := "ILLEGAL"
+                }
+            }
+        } else {
+            token{
+                Literal := ""
+                Type := "EOF"
+            }
+        }
+
+        Self.ReadCharacter()
+
+        Token
+    }
+
+    ReadCharacter<internal>()<transacts>:void = {
+        set Self._CurrentCharacter = option{"{Self.Input[Self.CurrentPosition]}"}
+        set Self.CurrentPosition += 1
+    }
+
+    PeekCharacter<private>()<computes><reads>:?string = {
+        option{"{Self.Input[Self.CurrentPosition]}"}
+    }
+
+    ReadString<private>()<transacts>:string = {
+        StartPosition := Self.CurrentPosition
+
+        loop {
+            Self.ReadCharacter()
+            Self._CurrentCharacter? <> "\"" or (break)
+        }
+
+        Self.Input.Slice[StartPosition, Self.CurrentPosition - 1] or Err("Unreachable")
+    }
+
+    ReadIdentifier<private>()<transacts>:string = {
+        StartPosition := Self.CurrentPosition - 1
+
+        loop {
+            Self.IsLetter[] or (break)
+            Self.ReadCharacter()
+        }
+
+        Self.Input.Slice[StartPosition, Self.CurrentPosition - 1] or Err("Unreachable")
+    }
+
+    ReadNumber<private>()<transacts>:string = {
+        StartPosition := Self.CurrentPosition - 1
+
+        loop {
+            Self.IsDigit[] or (break)
+            Self.ReadCharacter()
+        }
+
+        Self.Input.Slice[StartPosition, Self.CurrentPosition - 1] or Err("Unreachable")
+    }
+
+    IsLetter<private>()<computes><decides><reads>:void = {
+        Character := _CurrentCharacter?
+
+        CharCode := StringManipulation.PrintableCharacters[Character]
+
+        StringManipulation.alphabet_characters_range[CharCode] or Character = "_"
+    }
+
+    Logger : log = log{
+        Channel := log_channel
+    }
+
+    IsDigit<private>()<computes><decides><reads>:void = {
+        Character := _CurrentCharacter?
+        
+        CharCode := StringManipulation.PrintableCharacters[Character]
+
+        StringManipulation.numeric_characters_range[CharCode]
+    }
+
+    SkipWhitespace<private>()<transacts>:void = {
+        loop {
+            WhiteSpaceCharacters := array{" ", "\t", "\n", "\r"}
+            WhiteSpaceCharacters.Find[Self._CurrentCharacter?] or (break)
+            Self.ReadCharacter()
+        }
+    }
+}
+
+using. /UnrealEngine.com/Temporary/Diagnostics

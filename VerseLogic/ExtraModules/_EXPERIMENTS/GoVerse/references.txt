@@ -1,0 +1,7 @@
+https://go.googlesource.com/go/+/refs/heads/master
+https://github.com/golang/go
+
+https://go.googlesource.com/text
+https://github.com/golang/text
+
+https://github.com/golang/crypto

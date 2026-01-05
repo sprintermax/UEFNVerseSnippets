@@ -1,0 +1,1243 @@
+using. StringManipulation
+
+using. Token
+
+# Package ast declares the types used to represent syntax trees for Go
+# packages.
+#
+# Syntax trees may be constructed directly, but they are typically
+# produced from Go source code by the parser; see the ParseFile
+# function in package [go/parser].
+
+# ----------------------------------------------------------------------------
+# Interfaces
+#
+# There are 3 main classes of nodes: Expressions and type nodes,
+# statement nodes, and declaration nodes. The node names usually
+# match the corresponding Go spec production names to which they
+# correspond. The node fields correspond to the individual parts
+# of the respective productions.
+#
+# All nodes contain position information marking the beginning of
+# the corresponding source text segment; it is accessible via the
+# Pos accessor method. Nodes may contain additional position info
+# for language constructs where comments may be found between parts
+# of the construct (typically any larger, parenthesized subpart).
+# That position information is needed to properly position comments
+# when printing the construct.
+
+# All node types implement the Node interface.
+node<internal> := interface<internal> {
+    Pos<internal>()<computes>:int
+    End<internal>()<computes>:int
+}
+
+# All expression nodes implement the Expr interface.
+expression<internal> := interface<internal>(node) {}
+# All statement nodes implement the Stmt interface.
+statement<internal> := interface<internal>(node) {}
+# All declaration nodes implement the Decl interface.
+declaration<internal> := interface<internal>(node) {}
+
+# ----------------------------------------------------------------------------
+# Comments
+
+# A Comment node represents a single //-style or /*-style comment.
+#
+# The Text field contains the comment text without carriage returns (\r) that
+# may have been present in the source. Because a comment's end position is
+# computed using len(Text), the position reported by [Comment.End] does not match the
+# true source end position for comments containing carriage returns.
+comment<internal> := class<internal><computes>(node) {
+    Slash<internal> : int
+    Text<internal> : string
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Slash
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Slash + Self.Text.Length
+    }
+}
+
+# A CommentGroup represents a sequence of comments
+# with no other tokens and no empty lines between.
+comment_group<internal> := class<internal><computes>(node) {
+    List<internal> : []comment
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.List[0].Pos() or Err("Unreachable")
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.List[Self.List.Length - 1].End() or Err("Unreachable")
+    }
+
+    # Text returns the text of the comment.
+    # Comment markers (//, /*, and */), the first space of a line comment, and
+    # leading and trailing empty lines are removed.
+    # Comment directives like "//line" and "//go:noinline" are also removed.
+    # Multiple empty lines are reduced to one, and trailing space on lines is trimmed.
+    # Unless the result is empty, it is newline-terminated.
+    Text<private>():string = {
+
+        var Lines : []string = array{}
+
+        # Verse does not have 'continue' inside For loops
+        # Using nested Loop + For with ShouldSkip flag to simulate continue
+        loop {
+            for (RawComment : Self.List) {
+                var Comment : string = RawComment.Text
+                # Remove comment markers.
+                # The parser has given us exactly the comment text.
+                var ShouldSkip : logic = false
+
+                option{
+                    # //-style comment (no newline at the end)
+                    Comment[1] = '/'
+                    set Comment = Comment.Slice[2] or ""
+
+                    option{
+                        Comment.Length = 0
+                    }? or option{
+                        # strip first space - required for Example tests
+                        Comment[0] = ' '
+                        set Comment = Comment.Slice[1] or ""
+                    }? or option{
+                        IsDirective[Comment]
+                        set ShouldSkip = true
+                    }
+                }? or option{
+                    # /*-style comment */
+                    Comment[1] = '*'
+                    set Comment = Comment.Slice[2, Comment.Length - 2] or Err("Unreachable")
+                }
+
+                if (not ShouldSkip?) {
+                    # Split on newlines.
+                    CommentLines := Comment.SplitAt('\n')
+
+                    # Walk lines, stripping trailing white space and adding to list.
+                    set Lines += for (CommentLine : CommentLines) {
+                        StripTrailingWhiteSpace(CommentLine)
+                    }
+                }
+            }
+            break
+        }
+
+        # Remove leading blank lines; convert runs of
+        # interior blank lines to a single blank line.
+        var N : int = 0
+        for (Line : Lines) {
+            option{
+                Line <> "" or N > 0 and Lines[N - 1] <> ""
+                set Lines[N] = Line
+            }
+        }
+        set Lines = Lines.Slice[0, N] or Err("Unreachable")
+
+        # Add final "" entry to get trailing newline from Join.
+        option{
+            N > 0 and Lines[N - 1] <> ""
+            set Lines += array{""}
+        }
+        
+        Join(Lines, "\n")
+    }
+}
+
+IsWhiteSpace<internal>(Character:char)<computes><decides>:void = {
+    array{' ', '\t', '\n', '\r'}.Find[Character]
+}
+
+StripTrailingWhiteSpace<internal>(String:string)<transacts>:string = {
+    var Index : int = String.Length
+
+    loop {
+        Index > 0 and IsWhiteSpace[String[Index - 1]] or (break)
+
+        set Index -= 1
+    }
+
+    String.Slice[0, Index] or Err("Unreachable")
+}
+
+# isDirective reports whether c is a comment directive.
+# This code is also in go/printer.
+IsDirective<internal>(Comment:string)<decides><computes>:void = {
+    # "//line " is a line directive.
+	# "//extern " is for gccgo.
+	# "//export " is for cgo.
+	# (The // has been removed.)
+    option{
+        Comment.StartsWith["line "] or Comment.StartsWith["extern "] or Comment.StartsWith["export "]
+    }? or (
+        # "//[a-z0-9]+:[a-z0-9]"
+	    # (The // has been removed.)
+        Colon := Comment.Find[':']
+        Comment.Length < Colon + 1
+
+        for (Index := 0..Colon + 1, Index <> Colon) {
+            CharacterString := "{Comment[Index]}"
+            CharacterCode := PrintableCharacters[CharacterString]
+
+            alphabet_characters_range[CharacterCode] or numeric_characters_range[CharacterCode]
+        }
+    )
+}
+
+# ----------------------------------------------------------------------------
+# Expressions and types
+
+# A Field represents a Field declaration list in a struct type,
+# a method list in an interface type, or a parameter/result declaration
+# in a signature.
+# [Field.Names] is nil for unnamed parameters (parameter lists which only contain types)
+# and embedded struct fields. In the latter case, the field name is the type name.
+field<internal> := class<internal><computes>(node) {
+    Doc<internal> : ?comment_group # associated documentation; or nil
+    Names<internal> : []identifier # field/method/(type) parameter names; or nil
+    Type<internal> : ?expression  # field/method/parameter type; or nil
+    Tag<internal> : ?basic_literal # field tag; or nil
+    Comment<internal> : ?comment_group # line comments; or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Names[0].Pos() or Self.Type?.Pos() or Token.NoPos
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Tag?.End() or Self.Type?.End() or Self.Names[Self.Names.Length - 1].End() or Token.NoPos
+    }
+}
+
+# A FieldList represents a list of Fields, enclosed by parentheses,
+# curly braces, or square brackets.
+field_list<internal> := class<internal><computes>(node) {
+    Opening<internal> : int<#Token.pos#> # position of opening parenthesis/brace/bracket, if any
+    List<internal> : []field # field list; or nil
+    Closing<internal> : int<#Token.pos#> # position of closing parenthesis/brace/bracket, if any
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        not Self.Opening.IsValid[] or (return Self.Opening)
+
+        # the list should not be empty in this case;
+        # be conservative and guard against bad ASTs
+        Self.List[0].Pos() or Token.NoPos
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        not Self.Closing.IsValid[] or (return Self.Closing + 1)
+
+        # the list should not be empty in this case;
+        # be conservative and guard against bad ASTs
+        Self.List[Self.List.Length - 1].End() or Token.NoPos
+    }
+
+    # NumFields returns the number of parameters or struct fields represented by a [FieldList].
+    NumFields<private>():int = {
+        var Num : int = 0
+        
+        for (Field : Self.List) {
+            set Num += Field.Names.Length <> 0 or 1
+        }
+
+        Num
+    }
+}
+
+# An expression is represented by a tree consisting of one
+# or more of the following concrete expression nodes.
+
+# A BadExpr node is a placeholder for an expression containing
+# syntax errors for which a correct expression node cannot be
+# created.
+bad_expression<internal> := class<internal><computes>(expression) {
+    From<internal> : int<#Token.pos#> # position of first character belonging to bad expression
+    To<internal> : int<#Token.pos#> # position of first character immediately after the bad expression
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.From
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.To
+    }
+}
+
+identifier<internal> := class<internal><computes>(expression) {
+    NamePos<internal> : int<#Token.pos#> # position of the identifier
+    Name<internal> : string # identifier name
+    # Object<internal> : ?object # denoted object, or nil. Deprecated: see Object.
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.NamePos
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.NamePos + Self.Name.Length
+    }
+
+    # IsExported reports whether id starts with an upper-case letter.
+    (identifier:)IsExported<private>()<decides><computes>:void = {
+        Token.IsExported[Self.Name]
+    }
+
+    String<private>()<computes>:string = {
+        Self.Name
+    }
+}
+
+# An Ellipsis node stands for the "..." type in a
+# parameter list or the "..." length in an array type.
+ellipsis<internal> := class<internal><computes>(expression) {
+    Ellipsis<internal> : int<#Token.pos#> # position of "..."
+    EllipsisElementType<internal> : ?expression # ellipsis element type (parameter lists only); or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Ellipsis
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.EllipsisElementType?.End() or Self.Ellipsis + 3 # length of "..."
+    }
+}
+
+# A BasicLit node represents a literal of basic type.
+#
+# Note that for the CHAR and STRING kinds, the literal is stored
+# with its quotes. For example, for a double-quoted STRING, the
+# first and the last rune in the Value field will be ". The
+# [strconv.Unquote] and [strconv.UnquoteChar] functions can be
+# used to unquote STRING and CHAR values, respectively.
+#
+# For raw string literals (Kind == token.STRING && Value[0] == '`'),
+# the Value field contains the string text without carriage returns (\r) that
+# may have been present in the source. Because the end position is
+# computed using len(Value), the position reported by [BasicLit.End] does not match the
+# true source end position for raw string literals containing carriage returns.
+basic_literal<internal> := class<internal><computes>(expression) {
+    ValuePos<internal> : int<#Token.pos#> # position of literal
+    Kind<internal> : int<#Token.token#> # token.INT, token.FLOAT, token.IMAG, token.CHAR, or token.STRING
+    Value<internal> : string # literal string; e.g. 42, 0x7f, 3.14, 1e-9, 2.4i, 'a', '\x7f', "foo" or `\m\n\o`
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.ValuePos
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.ValuePos + Self.Value.Length
+    }
+}
+
+# A FuncLit node represents a function literal.
+function_literal<internal> := class<internal><computes>(expression) {
+    Type<internal> : function_type # function type
+    Body<internal> : block_statement # function body
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Type.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Body.End()
+    }
+}
+
+# A CompositeLit node represents a composite literal.
+composite_literal<internal> := class<internal><computes>(expression) {
+    Type<internal> : ?expression  # literal type; or nil
+    LBrace<internal> : int<#Token.pos#> # position of "{"
+    Elements<internal> : []expression # list of composite elements; or nil
+    RBrace<internal> : int<#Token.pos#> # position of "}"
+    Incomplete<internal> : logic # true if (source) expressions are missing in the Elements list
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Type?.Pos() or Self.LBrace
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.RBrace + 1
+    }
+}
+
+# A ParenExpr node represents a parenthesized expression.
+parenthesized_expression<internal> := class<internal><computes>(expression) {
+    LParen<internal> : int<#Token.pos#> # position of "("
+    X<internal> : expression  # parenthesized expression
+    RParen<internal> : int<#Token.pos#> # position of ")"
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.LParen
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.RParen + 1
+    }
+}
+
+# A SelectorExpr node represents an expression followed by a selector.
+selector_expression<internal> := class<internal><computes>(expression) {
+    X<internal> : expression  # expression
+    Selector<internal> : identifier # field selector
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.X.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Selector.End()
+    }
+}
+
+# A IndexExpr node represents an expression followed by an index or
+index_expression<internal> := class<internal><computes>(expression) {
+    X<internal> : expression  # expression
+    LBrack<internal> : int<#Token.pos#> # position of "["
+    Index<internal> : expression  # index expression
+    RBrack<internal> : int<#Token.pos#> # position of "]"
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.X.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.RBrack + 1
+    }
+}
+
+# An IndexListExpr node represents an expression followed by multiple indices.
+index_list_expression<internal> := class<internal><computes>(expression) {
+    X<internal> : expression  # expression
+    LBrack<internal> : int<#Token.pos#> # position of "["
+    Indices<internal> : []expression # index expressions
+    RBrack<internal> : int<#Token.pos#> # position of "]"
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.X.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.RBrack + 1
+    }
+}
+
+# A SliceExpr node represents an expression followed by slice indices.
+slice_expression<internal> := class<internal><computes>(expression) {
+    X<internal> : expression  # expression
+    LBrack<internal> : int<#Token.pos#> # position of "["
+    Low<internal> : ?expression # low index; or nil
+    High<internal> : ?expression # high index; or nil
+    (slice_expression:)Max<internal> : ?expression # max index; or nil
+    Sloce3<internal> : logic # true if 3-index slice (2 colons present)
+    RBrack<internal> : int<#Token.pos#> # position of "]"
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.X.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.RBrack + 1
+    }
+}
+
+# A TypeAssertExpr node represents an expression followed by a type assertion.
+type_assertion_expression<internal> := class<internal><computes>(expression) {
+    X<internal> : expression  # expression
+    LParen<internal> : int<#Token.pos#> # position of "("
+    Type<internal> : ?expression  # asserted type; nil means type switch X.(type)
+    RParen<internal> : int<#Token.pos#> # position of ")"
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.X.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.RParen + 1
+    }
+}
+
+# A CallExpr node represents an expression followed by an argument list.
+call_expression<internal> := class<internal><computes>(expression) {
+    Function<internal> : expression  # function expression
+    LParen<internal> : int<#Token.pos#> # position of "("
+    Arguments<internal> : []expression # function arguments; or nil
+    Ellipsis<internal> : int<#Token.pos#> # position of "..." (token.NoPos if there is no "...")
+    RParen<internal> : int<#Token.pos#> # position of ")"
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Function.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.RParen + 1
+    }
+}
+
+# A StarExpr node represents an expression of the form "*" Expression.
+# Semantically it could be a unary "*" expression, or a pointer type.
+star_expression<internal> := class<internal><computes>(expression) {
+    Star<internal> : int<#Token.pos#> # position of "*"
+    X<internal> : expression  # expression
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Star
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.X.End()
+    }
+}
+
+# A UnaryExpr node represents a unary expression.
+# Unary "*" expressions are represented via StarExpr nodes.
+unary_expression<internal> := class<internal><computes>(expression) {
+    OperatorPosition<internal> : int<#Token.pos#> # position of the operator
+    Operator<internal> : int<#Token.token#> # operator
+    X<internal> : expression  # operand
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.OperatorPosition
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.X.End()
+    }
+}
+
+# A BinaryExpr node represents a binary expression.
+binary_expression<internal> := class<internal><computes>(expression) {
+    X<internal> : expression  # left operand
+    OperatorPosition<internal> : int<#Token.pos#> # position of the operator
+    Operator<internal> : int<#Token.token#> # operator
+    Y<internal> : expression  # right operand
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.X.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Y.End()
+    }
+}
+
+# A KeyValueExpr node represents (key : value) pairs
+# in composite literals.
+key_value_expression<internal> := class<internal><computes>(expression) {
+    Key<internal> : expression  # key expression
+    Colon<internal> : int<#Token.pos#> # position of ":"
+    Value<internal> : expression  # value expression
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Key.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Value.End()
+    }
+}
+
+# The direction of a channel type is indicated by a bit
+# mask including one or both of the following constants.
+channel_direction<internal> := int
+
+# INDEX START = 1 << iota
+SEND<internal> : channel_direction = 1
+RECEIVE<internal> : channel_direction = 2
+
+# A type is represented by a tree consisting of one
+# or more of the following type-specific expression
+# nodes.
+
+# An ArrayType node represents an array or slice type.
+array_type<internal> := class<internal><computes>(expression) {
+    LBrack<internal> : int<#Token.pos#> # position of "["
+    Length<internal> : ?expression # Ellipsis node for [...]T array types, nil for slice types
+    Element<internal> : expression  # element type
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.LBrack
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Element.End()
+    }
+}
+
+# A StructType node represents a struct type.
+struct_type<internal> := class<internal><computes>(expression) {
+    Struct<internal> : int<#Token.pos#> # position of "struct" keyword
+    Fields<internal> : field_list # list of field declarations
+    Incomplete<internal> : logic # true if (source) fields are missing in the Fields list
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Struct
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Fields.End()
+    }
+}
+
+# Pointer types are represented via StarExpr nodes.
+
+# A FuncType node represents a function type.
+function_type<internal> := class<internal><computes>(expression) {
+    Function<internal> : int<#Token.pos#> # position of "func" keyword (token.NoPos if there is no "func")
+    TypeParameters<internal> : ?field_list # type parameters; or nil
+    Parameters<internal> : field_list # (incoming) parameters; non-nil
+    Results<internal> : ?field_list # (outgoing) results; or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        option{
+            Self.Function.IsValid[] # see issue 3870
+            Self.Function
+        }? or Self.Parameters.Pos() # interface method declarations have no "func" keyword
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Results?.End() or Self.Parameters.End()
+    }
+}
+
+# An InterfaceType node represents an interface type.
+interface_type<internal> := class<internal><computes>(expression) {
+    Interface<internal> : int<#Token.pos#> # position of "interface" keyword
+    Methods<internal> : field_list # list of embedded interfaces, methods, or types
+    Incomplete<internal> : logic # true if (source) methods or types are missing in the Methods list
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Interface
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Methods.End()
+    }
+}
+
+# A MapType node represents a map type.
+map_type<internal> := class<internal><computes>(expression) {
+    Map<internal> : int<#Token.pos#> # position of "map" keyword
+    Key<internal> : expression  # key type
+    Value<internal> : expression  # value type
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Map
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Value.End()
+    }
+}
+
+# A ChanType node represents a channel type.
+channel_type<internal> := class<internal><computes>(expression) {
+    Begin<internal> : int<#Token.pos#> # position of "chan" keyword or "<-" (whichever comes first)
+    Arrow<internal> : int<#Token.pos#> # position of "<-" (token.NoPos if there is no "<-")
+    Direction<internal> : channel_direction # channel direction
+    Value<internal> : expression  # value type
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Begin
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Value.End()
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Convenience functions for Idents
+
+# NewIdent creates a new [Ident] without position.
+# Useful for ASTs generated by code other than the Go parser.
+NewIdent<internal>(Name:string)<computes>:identifier = {
+    identifier{
+        NamePos := Token.NoPos
+        Name := Name
+    }
+}
+
+# IsExported reports whether name starts with an upper-case letter.
+(Ast:)IsExported<internal>(Name:string)<decides><computes>:void = {
+    Token.IsExported[Name]
+}
+
+# ----------------------------------------------------------------------------
+# Statements
+
+# A statement is represented by a tree consisting of one
+# or more of the following concrete statement nodes.
+
+# A BadStmt node is a placeholder for statements containing
+# syntax errors for which no correct statement nodes can be
+# created.
+bad_statement<internal> := class<internal><computes>(statement) {
+    From<internal> : int<#Token.pos#> # position of first character belonging to bad statement
+    To<internal> : int<#Token.pos#> # position of first character immediately after the bad statement
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.From
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.To
+    }
+}
+
+# A DeclStmt node represents a declaration in a statement list.
+declaration_statement<internal> := class<internal><computes>(statement) {
+    Declaration<internal> : declaration # *GenDecl with CONST, TYPE, or VAR token
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Declaration.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Declaration.End()
+    }
+}
+
+# An EmptyStmt node represents an empty statement.
+# The "position" of the empty statement is the position
+# of the immediately following (explicit or implicit) semicolon.
+empty_statement<internal> := class<internal><computes>(statement) {
+    Semicolon<internal> : int<#Token.pos#> # position of following ";"
+    Implicit<internal> : logic # if set, ";" was omitted in the source
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Semicolon
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Implicit? and Self.Semicolon or Self.Semicolon + 1 # length of ";"
+    }
+}
+
+# A LabeledStmt node represents a labeled statement.
+labeled_statement<internal> := class<internal><computes>(statement) {
+    Label<internal> : identifier # label name
+    Colon<internal> : int<#Token.pos#> # position of ":"
+    Statement<internal> : statement # statement
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Label.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Statement.End()
+    }
+}
+
+# An ExprStmt node represents a (stand-alone) expression
+# in a statement list.
+expression_statement<internal> := class<internal><computes>(statement) {
+    X<internal> : expression  # expression
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.X.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.X.End()
+    }
+}
+
+# A SendStmt node represents a send statement.
+send_statement<internal> := class<internal><computes>(statement) {
+    Channel<internal> : expression  # channel expression
+    Arrow<internal> : int<#Token.pos#> # position of "<-"
+    Value<internal> : expression  # value expression
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Channel.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Value.End()
+    }
+}
+
+# A IncDecStmt node represents an increment or decrement statement.
+increment_decrement_statement<internal> := class<internal><computes>(statement) {
+    X<internal> : expression  # expression
+    TokenPosition<internal> : int<#Token.pos#> # position of Token
+    (increment_decrement_statement:)Token<internal> : int<#Token.token#> # INC or DEC
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.X.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.TokenPosition + 2 # length of "++" or "--"
+    }
+}
+
+# An AssignStmt node represents an assignment or
+# a short variable declaration.
+assignment_statement<internal> := class<internal><computes>(statement) {
+    Lhs<internal> : []expression # left-hand side expressions
+    TokenPosition<internal> : int<#Token.pos#> # position of Token
+    (assignment_statement:)Token<internal> : int # assignment token, DEFINE
+    Rhs<internal> : []expression # right-hand side expressions
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Lhs[0].Pos() or Err("Unreachable")
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Rhs[Self.Rhs.Length - 1].End() or Err("Unreachable")
+    }
+}
+
+# A GoStmt node represents a go statement.
+go_statement<internal> := class<internal><computes>(statement) {
+    Go<internal> : int<#Token.pos#> # position of "go" keyword
+    Call<internal> : expression  # call expression
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Go
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Call.End()
+    }
+}
+
+# A DeferStmt node represents a defer statement.
+defer_statement<internal> := class<internal><computes>(statement) {
+    Defer<internal> : int<#Token.pos#> # position of "defer" keyword
+    Call<internal> : expression  # call expression
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Defer
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Call.End()
+    }
+}
+
+# A ReturnStmt node represents a return statement.
+return_statement<internal> := class<internal><computes>(statement) {
+    Return<internal> : int<#Token.pos#> # position of "return" keyword
+    Results<internal> : []expression # result expressions; or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Return
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Results[Self.Results.Length - 1].End() or Self.Return + 6 # length of "return"
+    }
+}
+
+# A BranchStmt node represents a break, continue, goto,
+# or fallthrough statement.
+branch_statement<internal> := class<internal><computes>(statement) {
+    TokenPosition<internal> : int<#Token.pos#> # position of Token
+    (branch_statement:)Token<internal> : int<#Token.token#> # keyword token (BREAK, CONTINUE, GOTO, FALLTHROUGH)
+    Label<internal> : ?identifier # label name; or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.TokenPosition
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Label?.End() or Self.TokenPosition + Self.Token.String().Length
+    }
+}
+
+# A BlockStmt node represents a braced statement block.
+block_statement<internal> := class<internal><computes>(statement) {
+    LBrace<internal> : int<#Token.pos#> # position of "{"
+    List<internal> : []statement # statement list; or nil
+    RBrace<internal> : int<#Token.pos#> # position of "}", if any (may be absent due to syntax error)
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.LBrace
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        (Self.RBrace.IsValid[] and Self.RBrace + 1) or Self.List[Self.List.Length - 1].End() or Self.LBrace + 1
+    }
+}
+
+# An IfStmt node represents an if statement.
+if_statement<internal> := class<internal><computes>(statement) {
+    If<internal> : int<#Token.pos#> # position of "if" keyword
+    Init<internal> : ?statement # initialization statement; or nil
+    Condition<internal> : expression  # condition expression
+    Body<internal> : block_statement # body of "if"
+    Else<internal> : ?statement # else branch; or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.If
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Else?.End() or Self.Body.End()
+    }
+}
+
+# A CaseClause represents a case of an expression or type switch statement.
+case_clause<internal> := class<internal><computes>(statement) {
+    Case<internal> : int<#Token.pos#> # position of "case" or "default" keyword
+    List<internal> : []expression # list of expressions; nil means default case
+    Colon<internal> : int<#Token.pos#> # position of ":"
+    Body<internal> : []statement # statement list; or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Case
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Body[Self.Body.Length - 1].End() or Self.Colon + 1 # length of ":"
+    }
+}
+
+# A SwitchStmt node represents an expression switch statement.
+switch_statement<internal> := class<internal><computes>(statement) {
+    Switch<internal> : int<#Token.pos#> # position of "switch" keyword
+    Init<internal> : ?statement # initialization statement; or nil
+    Tag<internal> : ?expression  # tag expression; or nil
+    Body<internal> : block_statement # switch body (CaseClauses only)
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Switch
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Body.End()
+    }
+}
+
+# A TypeSwitchStmt node represents a type switch statement.
+type_switch_statement<internal> := class<internal><computes>(statement) {
+    Switch<internal> : int<#Token.pos#> # position of "switch" keyword
+    Init<internal> : ?statement # initialization statement; or nil
+    Assign<internal> : assignment_statement # x := y.(type) or y.(type)
+    Body<internal> : block_statement # switch body (CaseClauses only)
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Switch
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Body.End()
+    }
+}
+
+# A CommClause node represents a case of a select statement.
+communication_clause<internal> := class<internal><computes>(statement) {
+    Case<internal> : int<#Token.pos#> # position of "case" or "default" keyword
+    Communication<internal> : ?statement # send or receive statement; nil means default case
+    Colon<internal> : int<#Token.pos#> # position of ":"
+    Body<internal> : []statement # statement list; or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Case
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Body[Self.Body.Length - 1].End() or Self.Colon + 1 # length of ":"
+    }
+}
+
+# A SelectStmt node represents a select statement.
+select_statement<internal> := class<internal><computes>(statement) {
+    Select<internal> : int<#Token.pos#> # position of "select" keyword
+    Body<internal> : block_statement # select body (CommClauses only)
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Select
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Body.End()
+    }
+}
+
+# A ForStmt represents a for statement.
+for_statement<internal> := class<internal><computes>(statement) {
+    For<internal> : int<#Token.pos#> # position of "for" keyword
+    Init<internal> : ?statement # initialization statement; or nil
+    Condition<internal> : ?expression  # condition; or nil
+    Post<internal> : ?statement # post iteration statement; or nil
+    Body<internal> : block_statement # body of "for"
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.For
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Body.End()
+    }
+}
+
+# A RangeStmt represents a for statement with a range clause.
+range_statement<internal> := class<internal><computes>(statement) {
+    For<internal> : int<#Token.pos#> # position of "for" keyword
+    Key<internal> : ?expression # key expression
+    Value<internal> : ?expression # value expression; or nil
+    TokenPosition<internal> : int<#Token.pos#> # position of Token; invalid if Key == nil
+    (range_statement:)Token<internal> : int<#Token.pos#> # ILLEGAL if Key == nil, ASSIGN, DEFINE
+    Range<internal> : int<#Token.pos#> # position of "range" keyword
+    X<internal> : expression  # value to range over
+    Body<internal> : block_statement # body of "for"
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.For
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Body.End()
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Declarations
+
+# A Spec node represents a single (non-parenthesized) import,
+# constant, type, or variable declaration.
+
+# The Spec type stands for any of *ImportSpec, *ValueSpec, and *TypeSpec.
+specification<internal> := interface<internal>(node) {}
+
+# An ImportSpec node represents a single import declaration.
+import_specification<internal> := class<internal><computes>(specification) {
+    Documentation<internal> : ?comment_group # associated documentation; or nil
+    Name<internal> : ?identifier # local package name (including "."); or nil
+    Path<internal> : basic_literal # import path
+    Comment<internal> : ?comment_group # line comments; or nil
+    EndPos<internal> : int<#Token.pos#> # end of spec (overrides Path.Pos if nonzero)
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Name?.Pos() or Self.Path.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.EndPos > 0 or Self.Path.End()
+    }
+}
+
+# A ValueSpec node represents a constant or variable declaration
+# (ConstSpec or VarSpec production).
+value_specification<internal> := class<internal><computes>(specification) {
+    Documentation<internal> : ?comment_group # associated documentation; or nil
+    Names<internal> : []identifier # value names (Length > 0)
+    Type<internal> : ?expression  # value type; or nil
+    Values<internal> : []expression # initial values; or nil
+    Comment<internal> : ?comment_group # line comments; or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Names[0].Pos() or Err("Unreachable")
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Values[Self.Values.Length - 1].End() or Self.Type?.End() or Self.Names[Self.Names.Length - 1].End() or Err("Unreachable")
+    }
+}
+
+# A TypeSpec node represents a type declaration (TypeSpec production).
+type_specification<internal> := class<internal><computes>(specification) {
+    Documentation<internal> : ?comment_group # associated documentation; or nil
+    Name<internal> : identifier # type name
+    TypeParameters<internal> : field_list  # type parameters; or nil
+    Assign<internal> : int<#Token.pos#> # position of '=', if any
+    Type<internal> : expression  # *Ident, *ParenExpr, *SelectorExpr, *StarExpr, or any of the *XxxTypes
+    Comment<internal> : ?comment_group # line comments; or nil
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Name.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Type.End()
+    }
+}
+
+# A declaration is represented by one of the following declaration nodes.
+
+# A BadDecl node is a placeholder for a declaration containing
+# syntax errors for which a correct declaration node cannot be
+# created.
+bad_declaration<internal> := class<internal><computes>(declaration) {
+    From<internal> : int<#Token.pos#> # position of first character belonging to bad declaration
+    To<internal> : int<#Token.pos#> # position of first character immediately after the bad declaration
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.From
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.To
+    }
+}
+
+# A GenDecl node (generic declaration node) represents an import,
+# constant, type or variable declaration. A valid LParen position
+# (LParen.IsValid()) indicates a parenthesized declaration.
+#
+# Relationship between Tok value and Specs element type:
+#
+#	token.IMPORT  *ImportSpec
+#	token.CONST   *ValueSpec
+#	token.TYPE    *TypeSpec
+#	token.VAR     *ValueSpec
+generic_declaration<internal> := class<internal><computes>(declaration) {
+    Documentation<internal> : ?comment_group # associated documentation; or nil
+    TokenPosition<internal> : int<#Token.pos#> # position of Token
+    (generic_declaration:)Token<internal> : int<#Token.token#> # IMPORT, CONST, TYPE, or VAR
+    LParen<internal> : int<#Token.pos#> # position of '(', if any
+    Specifications<internal> : []specification # list of specifications
+    RParen<internal> : int<#Token.pos#> # position of ')', if any
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.TokenPosition
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        (Self.RParen.IsValid[] and Self.RParen + 1) or Self.Specifications[0].End() or Err("Unreachable")
+    }
+}
+
+# A FuncDecl node represents a function declaration.
+function_declaration<internal> := class<internal><computes>(declaration) {
+    Documentation<internal> : ?comment_group # associated documentation; or nil
+    Receiver<internal> : ?field_list # receiver (methods); or nil (functions)
+    Name<internal> : identifier # function/method name
+    Type<internal> : function_type # function signature: type and value parameters, results, and position of "func" keyword
+    Body<internal> : ?block_statement # function body; or nil for external (non-Go) function
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Type.Pos()
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Body?.End() or Self.Type.End()
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Files and packages
+
+# A File node represents a Go source file.
+#
+# The Comments list contains all comments in the source file in order of
+# appearance, including the comments that are pointed to from other nodes
+# via Doc and Comment fields.
+#
+# For correct printing of source code containing comments (using packages
+# go/format and go/printer), special care must be taken to update comments
+# when a File's syntax tree is modified: For printing, comments are interspersed
+# between tokens based on their position. If syntax tree nodes are
+# removed or moved, relevant comments in their vicinity must also be removed
+# (from the [File.Comments] list) or moved accordingly (by updating their
+# positions). A [CommentMap] may be used to facilitate some of these operations.
+#
+# Whether and how a comment is associated with a node depends on the
+# interpretation of the syntax tree by the manipulating program: except for Doc
+# and [Comment] comments directly associated with nodes, the remaining comments
+# are "free-floating" (see also issues [#18593], [#20744]).
+#
+# [#18593]: https://go.dev/issue/18593
+# [#20744]: https://go.dev/issue/20744
+(Ast:)file<internal> := class<internal><computes>(node) {
+    Documentation<internal> : ?comment_group # associated documentation; or nil
+    Package<internal> : int<#Token.pos#> # position of "package" keyword
+    Name<internal> : identifier # package name
+    Declarations<internal> : []declaration # top-level declarations; or nil
+
+    FileStart<internal> : int<#Token.pos#> # position of first character belonging to the file
+    FileEnd<internal> : int<#Token.pos#> # position of first character immediately after the file
+    # Scope<internal> : ?scope # package scope (this file only). Deprecated: see Object
+    Imports<internal> : []import_specification # imports in this file
+    # Unresolved<internal> : []identifier # unresolved identifiers in this file. Deprecated: see Object
+    Comments<internal> : []comment_group # list of all comments in the source file
+    # GoVersion<internal> : ?string # minimum Go version required by //go:build or // +build directives
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Self.Package
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Self.Declarations[Self.Declarations.Length - 1].End() or Self.Name.End()
+    }
+}
+
+# A Package node represents a set of source files
+# collectively building a Go package.
+#
+# Deprecated: use the type checker [go/types] instead; see [Object].
+package_node<internal> := class<internal><computes>(node) {
+    Name<internal> : string # package name
+    # Scope<internal> : scope # package scope across all files
+    # Imports<internal> : [string]object # map of package id -> package object
+    Files<internal> : [string](Ast:)file # Go source files by filename
+
+    Pos<override>()<computes>:int<#Token.pos#> = {
+        Token.NoPos
+    }
+
+    End<override>()<computes>:int<#Token.pos#> = {
+        Token.NoPos
+    }
+}
+
+# IsGenerated reports whether the file was generated by a program,
+# not handwritten, by detecting the special comment described
+# at https://go.dev/s/generatedcode.
+#
+# The syntax tree must have been parsed with the [parser.ParseComments] flag.
+# Example:
+#
+#	f, err := parser.ParseFile(fset, filename, src, parser.ParseComments|parser.PackageClauseOnly)
+#	if err != nil { ... }
+#	gen := ast.IsGenerated(f)
+IsGenerated<internal>(File:(Ast:)file)<decides><transacts>:void = {
+    Generator[File]
+}
+
+
+SomeFunction():void = {}
+
+Generator<internal>(File:(Ast:)file)<decides><transacts>:string = {
+    var _GeneratedText : ?string = false
+
+    loop {
+        for (Group : File.Comments) {
+            not _GeneratedText? or (break)
+
+            loop {
+                for (Comment : Group.List) {
+                    not Comment.Pos() > File.Package or (break) # after package declaration
+
+                    # opt: check Contains first to avoid unnecessary array allocation in Split.
+                    Prefix := "// Code generated "
+                    # if (Comment.Text.Contains[Prefix]) {
+                        Lines := Comment.Text.SplitAt('\n')
+                        for (
+                            Line : Lines
+                            Rest := Line.CutPrefix[Prefix]
+                            Generated := Rest.CutSuffix[" DO NOT EDIT."]
+                        ) {
+                            set _GeneratedText = option{Generated}
+                            break
+                        }
+                    # }
+                }
+                break
+            }
+        }
+        break
+    }
+
+    _GeneratedText?
+}
+
+# Unparen returns the expression with any enclosing parentheses removed.
+Unparenthesis<internal>(Expression:parenthesized_expression)<computes>:expression = {
+    parenthesized_expression[Expression].X or Expression
+}

@@ -1,0 +1,3 @@
+https://www.rfc-editor.org/rfc/rfc9562.html
+https://github.com/google/uuid
+https://en.wikipedia.org/wiki/Universally_unique_identifier

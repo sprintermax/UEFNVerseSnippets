@@ -1,0 +1,196 @@
+node<public> := interface<internal> {
+    Token<internal> : token
+
+    TokenLiteral<protected>()<computes>:string = {
+        Self.Token.Literal
+    }
+
+    MakeString<public>()<computes>:string
+}
+
+statement_node<internal> := interface<internal>(node) {}
+
+expression_node<internal> := interface<internal><unique>(node) {}
+
+program_node<public> := class<internal><computes>(node) {
+    Statements<internal> : []statement_node
+
+    MakeString<override>()<computes>:string = {
+        ResultStrings := for (Statement : Self.Statements) {
+            Statement.MakeString()
+        }
+
+        Concatenate(ResultStrings)
+    }
+}
+
+ToString<internal>(Node:node)<computes>:string = {
+    Node.MakeString()
+}
+
+identifier_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Value<internal> : string
+
+    MakeString<override>()<computes>:string = {
+        Self.Value
+    }
+}
+
+let_statement_node<internal> := class<internal><computes>(statement_node) {
+    Name<internal> : identifier_expression_node
+    Value<internal> : expression_node
+
+    MakeString<override>()<computes>:string = {
+        "{Self.TokenLiteral()} {Self.Name} = {Self.Value};"
+    }
+}
+
+return_statement_node<internal> := class<internal><computes>(statement_node) {
+    ReturnValue<internal> : expression_node
+
+    MakeString<override>()<computes>:string = {
+        "{Self.TokenLiteral()} {Self.ReturnValue};"
+    }
+}
+
+expression_statement_node<internal> := class<internal><computes>(statement_node) {
+    Expression<internal> : expression_node
+
+    MakeString<override>()<computes>:string = {
+        "{Self.Expression}"
+    }
+}
+
+integer_literal_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Value<internal> : int
+
+    MakeString<override>()<computes>:string = {
+        "{Self.Value}"
+    }
+}
+
+prefix_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Operator<internal> : string
+    Right<internal> : expression_node
+
+    MakeString<override>()<computes>:string = {
+        "({Self.Operator}{Self.Right})"
+    }
+}
+
+infix_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Left<internal> : expression_node
+    Operator<internal> : string
+    Right<internal> : expression_node
+
+    MakeString<override>()<computes>:string = {
+        "({Self.Left} {Self.Operator} {Self.Right})"
+    }
+}
+
+boolean_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Value<internal> : logic
+
+    MakeString<override>()<computes>:string = {
+        Self.TokenLiteral()
+    }
+}
+
+block_statement_node<internal> := class<internal><computes>(statement_node) {
+    Statements<internal> : []statement_node
+
+    MakeString<override>()<computes>:string = {
+        ResultStrings := for (Statement : Self.Statements) {
+            Statement.MakeString()
+        }
+
+        "\{ {Concatenate(ResultStrings)} \}"
+    }
+}
+
+if_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Condition<internal> : expression_node
+    Consequence<internal> : block_statement_node
+    _Alternative<internal> : ?block_statement_node
+
+    MakeString<override>()<computes>:string = {
+        "if {Self.Condition} {Self.Consequence}" + (
+            " else {Self._Alternative?}" or "null"
+        )
+    }
+}
+
+function_literal_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Parameters<internal> : []identifier_expression_node
+    Body<internal> : block_statement_node
+
+    MakeString<override>()<computes>:string = {
+        ParametersLength := Parameters.Length
+
+        ParameterStrings := for (Parameter : Self.Parameters) {
+            "{Parameter}"
+        }
+
+        "{Self.TokenLiteral()}({Join(ParameterStrings, ", ")}){Self.Body}"
+    }
+}
+
+call_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Function<internal> : expression_node
+    Arguments<internal> : []expression_node
+
+    MakeString<override>()<computes>:string = {
+        ArgumentsLength := Arguments.Length
+
+        ArgumentStrings := for (Argument : Self.Arguments) {
+            "{Argument}"
+        }
+
+        "{Self.Function}({Join(ArgumentStrings, ", ")})"
+    }
+}
+
+string_literal_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Value<internal> : string
+
+    MakeString<override>()<computes>:string = {
+        Self.TokenLiteral()
+    }
+}
+
+array_literal_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Elements<internal> : []expression_node
+
+    MakeString<override>()<computes>:string = {
+        ElementsLength := Elements.Length
+
+        ElementStrings := for (Element : Self.Elements) {
+            "{Element}"
+        }
+
+        "[{Join(ElementStrings, ", ")}]"
+    }
+}
+
+index_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Left<internal> : expression_node
+    Index<internal> : expression_node
+
+    MakeString<override>()<computes>:string = {
+        "({Self.Left}[{Self.Index}])"
+    }
+}
+
+hash_literal_expression_node<internal> := class<internal><computes><allocates>(expression_node) {
+    Pairs<internal> : [expression_node]expression_node
+
+    MakeString<override>()<computes>:string = {
+        PairsLength := Pairs.Length
+
+        PairStrings := for (Key->Value : Self.Pairs) {
+            "{Key}:{Value}"
+        }
+
+        "\{{Join(PairStrings, ", ")}\}"
+    }
+}

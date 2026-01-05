@@ -1,0 +1,4 @@
+# Ignore folders starting with __TEMP
+**/__TEMP*/
+# Ignore files starting with __TEMP.
+**/__TEMP.*

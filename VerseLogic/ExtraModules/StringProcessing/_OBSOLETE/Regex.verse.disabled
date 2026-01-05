@@ -1,0 +1,693 @@
+using. StringManipulation
+using. VerseFeatures
+
+## THIS IS JUST A TEST, NOT READY FOR PRODUCTION USAGE
+
+RegexStuff<public> := module {
+
+    nfa_state<internal> := class<internal><unique> {
+        var<private> Transitions<internal> : [string][]nfa_state = map{}
+        var<private> EpsilonTransitions<internal> : []nfa_state = array{}
+        var<internal> IsFinal<internal> : logic = false
+
+        AddTransition<internal>(Char:string, State:nfa_state)<transacts>:void = {
+            (set Transitions[Char] += array{State}) or void
+        }
+
+        AddEpsilonTransition<internal>(State:nfa_state)<transacts>:void = {
+            set EpsilonTransitions += array{State}
+        }
+
+        Match<private>(String:string)<decides><transacts>:void = depth_first_search[Self, (String, 0)]
+
+        depth_first_search<private>(State:nfa_state, Args:tuple(string, int))<decides><transacts>:void = {
+            String := Args(0)
+            Position := Args(1)
+
+            # TODO: Check to optimize this later
+            (Position = String.Length and State.IsFinal? or State.EpsilonTransitions.FindByDynamic[depth_first_search, (String, Position)]) or
+            State.EpsilonTransitions.FindByDynamic[depth_first_search, (String, Position)] or
+            State.EpsilonTransitions.FindByDynamic[depth_first_search, (String, Position + 1)]
+        }
+    }
+
+    dfa_state<public> := class<internal><unique> {
+
+        NFAStates<internal> : []nfa_state
+        var<private> Transitions<private> : [string]dfa_state = map{}
+
+        # is_final<private>(State:nfa_state)<decides><transacts>:void = State.IsFinal?
+
+        IsFinal<private>()<decides><transacts>:void = {
+            var Result : logic = false
+
+            # NFAStates.FindBy[is_final] # Unoptimized
+
+            loop {
+                for (State : NFAStates, State.IsFinal?) {
+                    set Result = true
+                    break
+                }
+                break
+            }
+            Result?
+        }
+
+        AddTransition<internal>(Char:string, State:dfa_state)<transacts>:void = {
+            (set Transitions[Char] = State) or void
+        }
+
+        Match<public>(String:string)<decides><transacts>:void = {
+            var CurrentState : dfa_state = Self
+
+            for (Char : String) {
+                if (NewState := CurrentState.Transitions["{Char}"]) {
+                    set CurrentState = NewState
+                } else {
+                    Failure[]
+                }
+            }
+
+            CurrentState.IsFinal[]
+        }
+
+        GetAllStates<private>(PreviousVisited:[]dfa_state)<transacts>:[]dfa_state = { # Check for functionality accuracy
+            var Visited : []dfa_state = PreviousVisited + array{Self}
+
+            for (NextState : Self.Transitions, not Visited.Find[NextState]) {
+                set Visited += NextState.GetAllStates(Visited)
+            }
+
+            Visited
+        }
+    }
+
+    EpsilonClosure<internal>(NFAState:nfa_state, ?PreviousVisited:[]nfa_state=array{})<transacts>:[]nfa_state = {
+        if (PreviousVisited.Find[NFAState]). return array{NFAState}
+
+        array{NFAState} + EpsilonClosureSet(NFAState.EpsilonTransitions, ?PreviousVisited:=PreviousVisited + array{NFAState})
+    }
+
+    EpsilonClosureSet<internal>(NFAStates:[]nfa_state, ?PreviousVisited:[]nfa_state=array{})<transacts>:[]nfa_state = {
+        var Result : []nfa_state = array{}
+
+        for (NFAState : NFAStates) {
+            set Result += EpsilonClosure(NFAState, ?PreviousVisited:=PreviousVisited)
+        }
+
+        Result
+    }
+
+    NFAToDFA<internal>(StartNFAState:nfa_state)<transacts>:dfa_state = {
+        StartDFAState := dfa_state{
+            NFAStates := EpsilonClosure(StartNFAState)
+        }
+        var UnmarkedStates : []dfa_state = array{StartDFAState}
+
+        var DFAStateMapping : [comparable]dfa_state = map{} # [[]nfa_state]dfa_state instead of comparable
+
+        loop {
+            UnmarkedStatesLength := UnmarkedStates.Length
+            if (UnmarkedStatesLength = 0). break
+
+            CurrentDFAState := UnmarkedStates[UnmarkedStatesLength - 1] or Err("Unreachable")
+            set UnmarkedStates = UnmarkedStates.RemoveElement[UnmarkedStatesLength - 1] or Err("Unreachable")
+
+            for (State : CurrentDFAState.NFAStates, Char->_Unused : State.Transitions) {
+                var NextNFAStates : []nfa_state = array{}
+                for (NFAState : CurrentDFAState.NFAStates) {
+                    (set NextNFAStates += NFAState.Transitions[Char]) or void
+                }
+
+                NextNFAStatesClosure := EpsilonClosureSet(NextNFAStates)
+                FrozenNextNFAStatesClosure := EpsilonClosureSet(NextNFAStates)
+
+                NextDFAState := DFAStateMapping[NextNFAStatesClosure] or (
+                    _NextDFAState := dfa_state{
+                        NFAStates := NextNFAStatesClosure
+                    }
+                    set UnmarkedStates += array{_NextDFAState}
+                    (set DFAStateMapping[NextNFAStatesClosure] = _NextDFAState) or void
+                    _NextDFAState
+                )
+
+                CurrentDFAState.AddTransition(Char, NextDFAState)
+            }
+
+        }
+
+        StartDFAState
+    }
+
+    token_type<internal> := enum<internal> {
+        Literal
+        GroupStart
+        GroupEnd
+        ClassStart
+        ClassEnd
+        Or
+        Wildcard
+        ZeroOrMore
+        OneOrMore
+        ZeroOrOne
+        Escaped
+        Range
+        SpecificQuantifier
+        StartAnchor
+        EndAnchor
+    }
+
+    ast_node<internal> := class<internal><abstract><unique> {
+        Convert<internal>(StartState:nfa_state)<transacts>:nfa_state
+    }
+
+    literal_ast_node<internal> := class<internal>(ast_node) {
+        Value<internal>:string
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            EndState := nfa_state{}
+            StartState.AddTransition(Self.Value, EndState)
+            EndState
+        }
+    }
+
+    range_ast_node<internal> := class<internal>(ast_node) {
+        Wildcard<private> : string = "WILDCARD"
+        Start<internal>:string
+        End<internal>:string
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            EndState := nfa_state{}
+
+            _Start := Self.Start
+            _End := Self.End
+
+            if (_Start = Self.Wildcard and _End = Self.Wildcard) {
+                for (CharInt := 0..255, CharString := AllCharacters.FindKeyByValue[CharInt]) {
+                    StartState.AddTransition(CharString, EndState)
+                }
+            } else {
+                for (CharInt := AllCharacters[_Start]..AllCharacters[_End] + 1, CharString := AllCharacters.FindKeyByValue[CharInt]) {
+                    StartState.AddTransition(CharString, EndState)
+                }
+            }
+            EndState
+        }
+    }
+
+    class_ast_node<internal> := class<internal>(ast_node) {
+        Ranges<internal>:[]ast_node
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            EndState := nfa_state{}
+            for (RangeNode : Self.Ranges) {
+                RangeNode.Convert(StartState).AddEpsilonTransition(EndState)
+            }
+            EndState
+        }
+    }
+
+    zero_or_more_ast_node<internal> := class<internal>(ast_node) {
+        Node<internal>:ast_node
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            LoopState := nfa_state{}
+            EndState := nfa_state{}
+            StartState.AddEpsilonTransition(LoopState)
+            LoopState.AddEpsilonTransition(EndState)
+            Self.Node.Convert(LoopState).AddEpsilonTransition(LoopState)
+            EndState
+        }
+    }
+
+    one_or_more_ast_node<internal> := class<internal>(ast_node) {
+        Node<internal>:ast_node
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            RepeatState := nfa_state{}
+            StartState.AddEpsilonTransition(RepeatState)
+            EndState := Self.Node.Convert(RepeatState)
+            EndState.AddEpsilonTransition(RepeatState)
+            FinalState := nfa_state{}
+            EndState.AddEpsilonTransition(FinalState)
+            FinalState
+        }
+    }
+
+    zero_or_one_ast_node<internal> := class<internal>(ast_node) {
+        Node<internal>:ast_node
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            EndState := nfa_state{}
+            StartState.AddEpsilonTransition(EndState)
+            Self.Node.Convert(StartState).AddEpsilonTransition(EndState)
+            EndState
+        }
+    }
+
+    specific_quantifier_ast_node<internal> := class<internal>(ast_node) {
+        Node<internal>:ast_node
+        _Min<internal>:int
+        _Max<internal>:?int
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            if (Self._Min > Self._Max?). Err("Min must be less than or equal to max")
+
+            var CurrentState : nfa_state = StartState
+            for (_Unused := 0..Self._Min - 1) {
+                set CurrentState = Self.Node.Convert(CurrentState)
+            }
+
+            EndState := nfa_state{}
+
+            if (__Max := _Max?) {
+                var OptionalState : nfa_state = CurrentState
+                for (_Unused := 0..__Max - Self._Min - 1) {
+                    OptionalState.AddEpsilonTransition(EndState)
+                    set OptionalState = Self.Node.Convert(OptionalState)
+                }
+                OptionalState.AddEpsilonTransition(EndState)
+            } else {
+                var OptionalState : nfa_state = CurrentState
+                OptionalState.AddEpsilonTransition(EndState)
+                set OptionalState = Self.Node.Convert(OptionalState)
+                OptionalState.AddEpsilonTransition(EndState)
+            }
+
+            EndState
+        }
+    }
+
+    concatenation_ast_node<internal> := class<internal>(ast_node) {
+        Nodes<internal>:[]ast_node
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            var CurrentState : nfa_state = StartState
+            for (SubNode : Self.Nodes) {
+                set CurrentState = SubNode.Convert(CurrentState)
+            }
+            CurrentState
+        }
+    }
+
+    alternation_ast_node<internal> := class<internal>(ast_node) {
+        Nodes<internal>:[]ast_node
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            EndState := nfa_state{}
+            for (SubNode : Self.Nodes) {
+                BranchState := SubNode.Convert(StartState)
+                BranchState.AddEpsilonTransition(EndState)
+            }
+            EndState
+        }
+    }
+
+    group_ast_node<internal> := class<internal>(ast_node) {
+        Node<internal>:ast_node
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            EndState := Self.Node.Convert(StartState)
+            EndState
+        }
+    }
+
+    escaped_character_ast_node<internal> := class<internal>(ast_node) {
+        Value<internal>:string
+
+        Convert<override>(StartState:nfa_state)<transacts>:nfa_state = {
+            EndState := nfa_state{}
+
+            if (Self.Value = "d") {
+                for (Char : "0123456789") {
+                    StartState.AddTransition("{Char}", EndState)
+                }
+            } else if (Self.Value = "w") {
+                for (Char : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") {
+                    StartState.AddTransition("{Char}", EndState)
+                }
+            } else if (Self.Value = "s") {
+                for (Char : "␉␊␍␌␋") {
+                    StartState.AddTransition("{Char}", EndState)
+                }
+            } else {
+                StartState.AddTransition(Self.Value, EndState)
+            }
+
+            EndState
+        }
+    }
+
+    token<internal> := class<internal> {
+        Type<internal>:token_type
+        Value<internal>:string
+    }
+
+    tokenizer<internal> := class<internal> {
+        var<private> Tokens<private> : ?Container(token) = false
+        # var<private> Previous<private> : ?token = false
+        # var<private> Current<private> : ?token = false
+
+        Init<internal>(_Regex:string)<transacts>:tokenizer = {
+            set Tokens = option{Self.Tokenize(_Regex)}
+            # set Current = option{Tokens?.GetAtPointer[]}
+            Self.Next()
+            # if (NewTokens := Tokens?.SetPointerPosition[Tokens?.PointerPosition + 1]) {
+            #     set Tokens = option{NewTokens}
+            # }
+            Self
+        }
+
+        GetPrevious<internal>()<transacts>:token = {
+            # Previous? or Err("No previous token")
+
+            Tokens?.GetAtIndex[Tokens?.PointerPosition - 1](1) or Err("No previous token")
+        }
+
+        GetCurrent<internal>()<transacts>:token = {
+            # Current? or Err("Unexpected end of input")
+
+            Tokens?.GetAtPointer[] or Err("No previous token")
+        }
+
+        Next<private>()<transacts>:void = {
+            # set Self.Previous = Self.Current
+            # set Current = option{Tokens?.GetAtPointer[]}
+            if (NewTokens := Tokens?.SetPointerPosition[Tokens?.PointerPosition + 1]) {
+                set Tokens = option{NewTokens}
+            }
+        }
+
+        IsDone<internal>()<decides><transacts>:void = {
+            Tokens?.PointerPosition = Tokens?.Size() - 1
+        }
+
+        Match<internal>(TokenType:token_type)<decides><transacts>:void = {
+            not Self.IsDone[]
+            Self.GetCurrent().Type = TokenType
+            Self.Next()
+        }
+
+        Expect<internal>(TokenType:token_type)<transacts>:void = {
+            Self.Match[TokenType] or Err("Expected token did not match")
+        }
+
+        Tokenize<private>(_Regex:string)<transacts>:Container(token) = {
+
+            var Elements : []token = array{}
+
+            var Index : int = 0
+            loop {
+                if (Index >= _Regex.Length). break
+
+                Char := "{_Regex[Index]}" or Err("Empty regex")
+
+                set Elements += array{
+                    case (Char) {
+                        "(" => token{
+                            Type := token_type.GroupStart
+                            Value := Char
+                        }
+                        ")" => token{
+                            Type := token_type.GroupEnd
+                            Value := Char
+                        }
+                        "[" => token{
+                            Type := token_type.ClassStart
+                            Value := Char
+                        }
+                        "]" => token{
+                            Type := token_type.ClassEnd
+                            Value := Char
+                        }
+                        "|" => token{
+                            Type := token_type.Or
+                            Value := Char
+                        }
+                        "*" => token{
+                            Type := token_type.ZeroOrMore
+                            Value := Char
+                        }
+                        "+" => token{
+                            Type := token_type.OneOrMore
+                            Value := Char
+                        }
+                        "?" => token{
+                            Type := token_type.ZeroOrOne
+                            Value := Char
+                        }
+                        "." => token{
+                            Type := token_type.Wildcard
+                            Value := Char
+                        }
+                        # "^" => token{ <# Unsupported/Uninplemented #>
+                        #     Type := token_type.StartAnchor
+                        #     Value := Char
+                        # }
+                        # "$" => token{ <# Unsupported/Uninplemented #>
+                        #     Type := token_type.EndAnchor
+                        #     Value := Char
+                        # }
+                        "\\" => {
+                            set Index += 1
+                            _Char := "{_Regex[Index]}" or Err("Unfinished escape sequence")
+                            token{
+                                Type := token_type.Escaped
+                                Value := _Char
+                            }
+                        }
+                        "\{" => {
+                            Start := Index + 1
+                            var Stop : int = Index
+                            loop {
+                                if (_Regex[Stop] = "\}"). break
+                                Stop < _Regex.Length or Err("Unfinished quantifier")
+                                set Stop += 1
+                            }
+
+                            TrimmedString : string = _Regex.Slice[Start,Stop] or Err("Unreachable???")
+
+                            var CleanedString : string = ""
+
+                            for (_Char : TrimmedString, String := "{_Char}", " " <> String, "␉" <> String). set CleanedString += String
+
+                            token{
+                                Type := token_type.SpecificQuantifier
+                                Value := CleanedString
+                            }
+                        }
+                        "-" => token{
+                            Type := token_type.Range
+                            Value := Char
+                        }
+                        _ => token{
+                            Type := token_type.Literal
+                            Value := Char
+                        }
+                    }
+                }
+
+                set Index += 1
+            }
+
+            Container(token){
+                Elements := Elements
+                PointerPosition := 0
+            }
+        }
+    }
+
+    ast_parser<internal> := class<internal> {
+        Tokenizer<internal> : tokenizer
+
+        Parse<internal>()<transacts>:ast_node = {
+            Self.ParseRegex()
+        }
+
+        ParseRegex<private>()<transacts>:ast_node = {
+            var Concatenations : []ast_node = array{Self.ParseConcatenation()}
+
+            loop {
+                if (not Self.Tokenizer.IsDone[] and Self.Tokenizer.Match[token_type.Or]) {
+                    set Concatenations += array{Self.ParseConcatenation()}
+                } else. break
+            }
+
+            Concatenations.Length > 1 and alternation_ast_node{
+                Nodes := Concatenations
+            } or Concatenations[0] or Err("Unreachable")
+        }
+
+        ParseConcatenation<private>()<transacts>:ast_node = {
+            var Units : []ast_node = array{Self.ParseUnit()}
+
+            loop {
+                if (not Self.Tokenizer.IsDone[] and not array{token_type.Or, token_type.GroupEnd}.Find[Self.Tokenizer.GetCurrent().Type]) {
+                    set Units += array{Self.ParseUnit()}
+                } else. break
+            }
+
+            Units.Length > 1 and concatenation_ast_node{
+                Nodes := Units
+            } or Units[0] or Err("Unreachable")
+        }
+
+        ParseUnit<private>()<transacts>:ast_node = {
+            Unit := Self.ParseBasicUnit()
+
+            if (Self.Tokenizer.IsDone[]) {
+                return Unit
+            } else {
+                Self.ParseQuantifier(Unit)
+            }
+
+        }
+
+        ParseBasicUnit<private>()<transacts>:ast_node = {
+            if (Self.Tokenizer.Match[token_type.Literal]) {
+                literal_ast_node{
+                    Value := Self.Tokenizer.GetPrevious().Value
+                }
+            } else if (Self.Tokenizer.Match[token_type.ClassStart]) {
+                class_ast_node{
+                    Ranges := Self.ParseCharRanges()
+                }
+            } else if (Self.Tokenizer.Match[token_type.GroupStart]) {
+                _Regex := Self.ParseRegex()
+                Self.Tokenizer.Expect(token_type.GroupEnd)
+                group_ast_node{
+                    Node := _Regex
+                }
+            } else if (Self.Tokenizer.Match[token_type.Escaped]) {
+                escaped_character_ast_node{
+                    Value := Self.Tokenizer.GetPrevious().Value
+                }
+            } else if (Self.Tokenizer.Match[token_type.Wildcard]) {
+                range_ast_node{
+                    Start := "WILDCARD"
+                    End := "WILDCARD"
+                }
+            } else if (Self.Tokenizer.Match[token_type.Range]) {
+                literal_ast_node{
+                    Value := Self.Tokenizer.GetPrevious().Value
+                }
+            } else {
+                Err("Unexpected Token Unit")
+            }
+        }
+
+        ParseQuantifier<private>(Unit:ast_node)<transacts>:ast_node = {
+            if (Self.Tokenizer.Match[token_type.ZeroOrMore]) {
+                zero_or_more_ast_node{
+                    Node := Unit
+                }
+            } else if (Self.Tokenizer.Match[token_type.OneOrMore]) {
+                one_or_more_ast_node{
+                    Node := Unit
+                }
+            } else if (Self.Tokenizer.Match[token_type.ZeroOrOne]) {
+                zero_or_one_ast_node{
+                    Node := Unit
+                }
+            } else if (Self.Tokenizer.Match[token_type.SpecificQuantifier]) {
+                TokenizerPreviousValue := Self.Tokenizer.GetPrevious().Value
+                SplitIndex := TokenizerPreviousValue.Find[","] or -1
+                LeftPart := TokenizerPreviousValue.Slice[0, SplitIndex] or ""
+                RightPart := TokenizerPreviousValue.Slice[SplitIndex, TokenizerPreviousValue.Length] or ""
+                QuantifierParts := array{LeftPart, RightPart}
+                specific_quantifier_ast_node{
+                    Node := Unit
+                    _Min := ParseInt[LeftPart] or 0
+                    _Max := option{ParseInt[RightPart]}
+                }
+            } else {
+                Unit
+            }
+        }
+
+        ParseCharRanges<private>()<transacts>:[]ast_node = {
+            var CharRange : []ast_node = array{}
+
+            loop {
+                if (Self.Tokenizer.Match[token_type.ClassEnd]). break
+
+                Start := Self.ParseChar()
+
+                if (Self.Tokenizer.Match[token_type.Range]) {
+                    End := Self.ParseChar()
+                    set CharRange += array{
+                        range_ast_node{
+                            Start := Start
+                            End := End
+                        }
+                    }
+                } else {
+                    set CharRange += array{
+                        range_ast_node{
+                            Start := Start
+                            End := Start
+                        }
+                    }
+                }
+            }
+
+            CharRange
+        }
+
+        ParseChar<private>()<transacts>:string = {
+            if (Self.Tokenizer.Match[token_type.Escaped]) {
+                Self.Tokenizer.GetPrevious().Value
+            } else if (Self.Tokenizer.Match[token_type.Literal]) {
+                Self.Tokenizer.GetPrevious().Value
+            } else if (Self.Tokenizer.Match[token_type.Wildcard]) {
+                "WILDCARD"
+            } else {
+                Err("Unexpected Token Char")
+            }
+        }
+    }
+
+    ASTToNFA<internal>(ASTNode:ast_node)<transacts>:nfa_state = {
+        StartState := nfa_state{}
+        EndState := ASTNode.Convert(StartState)
+        set EndState.IsFinal = true
+        StartState
+    }
+
+    Compile<public>(Pattern:string)<transacts>:dfa_state = {
+        NFAToDFA(ASTToNFA(ast_parser{Tokenizer := tokenizer{}.Init(Pattern)}.Parse()))
+    }
+}
+
+using. /Fortnite.com/Devices
+
+test_device_regex_game := class(creative_device) {
+    OnBegin<override>():void = {
+        CompiledRegex := RegexStuff.Compile("a(b|c)*d")
+
+        CompiledRegex.Match["abccbd"] and Print("Matched 1!") or Print("Did not match 1!")
+        CompiledRegex.Match["abccbde"] and Print("Matched 2!") or Print("Did not match 2!")
+    }
+}
+
+test_device_regex := class(creative_device) {
+    block {
+
+        CompiledRegex := RegexStuff.Compile("abcd")
+        Print("===========\nCompiled Regex for Test 1!")
+
+        CompiledRegex.Match["abc"] and Print("Test 1 Matched 1!") or Print("Test 1 Did not match 1!")
+        CompiledRegex.Match["abcd"] and Print("Test 1 Matched 2!") or Print("Test 1 Did not match 2!")
+        CompiledRegex.Match["abbc"] and Print("Test 1 Matched 3!") or Print("Test 1 Did not match 3!")
+        CompiledRegex.Match[".*"] and Print("Test 1 Matched 4!") or Print("Test 1 Did not match 4!")
+        CompiledRegex.Match["."] and Print("Test 1 Matched 5!") or Print("Test 1 Did not match 5!")
+        CompiledRegex.Match["*"] and Print("Test 1 Matched 6!") or Print("Test 1 Did not match 6!")
+
+        CompiledRegex2 := RegexStuff.Compile("a(b|c)*d")
+        Print("===========\nCompiled Regex for Test 2!")
+
+        CompiledRegex2.Match["abccbd"] and Print("Test 2 Matched 1!") or Print("Test 2 Did not match 1!")
+        CompiledRegex2.Match["abccbde"] and Print("Test 2 Matched 2!") or Print("Test 2 Did not match 2!")
+
+    }
+}

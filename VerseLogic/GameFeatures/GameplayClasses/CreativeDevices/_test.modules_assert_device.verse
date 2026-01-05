@@ -5,8 +5,9 @@ using. /Verse.org/Colors
 using. /Verse.org/Random
 using. /Verse.org/Simulation
 
-using. ExtraModules.BitMath
+# using. ExtraModules.BitMath._OBSOLETE.BitMath
 using. ExtraModules.DebugFeatures
+# using. ExtraModules.StringManipulation
 using. ExtraModules.TextLocalization
 using. ExtraModules.UnrealEngineFeatures
 using. ExtraModules.VerseFeatures
@@ -51,7 +52,7 @@ modules_assert_test_device<internal> := class<final>(
         Sleep(1.0)
         AssertTextLocalization()
         Sleep(1.0)
-        AssertBitMath()
+        # AssertBitMath()
 
         Log_CosmeticWarning("Tests Completed - Results:\nPassed: {Passed} | Failed: {Failed} | Total: {Passed + Failed}")
     }
@@ -242,25 +243,25 @@ modules_assert_test_device<internal> := class<final>(
         ### String Utils
         Sleep(0.0)
 
-        Assert("String should be converted to positive integer 381")
-        if (StringToInt["381"] = 381). Pass()
-        else. Fail()
+        # Assert("String should be converted to positive integer 381")
+        # if (ParseInt["381"] = 381). Pass()
+        # else. Fail()
 
-        Assert("String should be converted to negative integer -248")
-        if (StringToInt["-248"] = -248). Pass()
-        else. Fail()
+        # Assert("String should be converted to negative integer -248")
+        # if (ParseInt["-248"] = -248). Pass()
+        # else. Fail()
 
-        Assert("Empty string should fail conversion to integer")
-        if (StringToInt[""]). Fail()
-        else. Pass()
+        # Assert("Empty string should fail conversion to integer")
+        # if (ParseInt[""]). Fail()
+        # else. Pass()
 
-        Assert("Float String should fail conversion to integer")
-        if (StringToInt["1.0256"]). Fail()
-        else. Pass()
+        # Assert("Float String should fail conversion to integer")
+        # if (ParseInt["1.0256"]). Fail()
+        # else. Pass()
 
-        Assert("Non-numeric String should fail conversion to integer")
-        if (StringToInt["Hello World"]). Fail()
-        else. Pass()
+        # Assert("Non-numeric String should fail conversion to integer")
+        # if (ParseInt["Hello World"]). Fail()
+        # else. Pass()
         
     }
 
@@ -320,77 +321,77 @@ modules_assert_test_device<internal> := class<final>(
 
     }
 
-    AssertBitMath()<suspends>:void = {
-        Log_CosmeticWarning("Asserting BitMath Module")
+    # AssertBitMath()<suspends>:void = {
+    #     Log_CosmeticWarning("Asserting BitMath Module")
 
-        Assert("Bitwise And operations must provides expected values")
-        if (
-            BitwiseAnd(5, 3) = 1
-            BitwiseAnd(14530, 84573912) = 14528
-            BitwiseAnd(-14530, -84512) = -96992
-            BitwiseAnd(-5, -2) = -6
-            BitwiseAnd(-5, 7) = 3
-        ). Pass()
-        else. Fail()
+    #     Assert("Bitwise And operations must provides expected values")
+    #     if (
+    #         BitwiseAnd(5, 3) = 1
+    #         BitwiseAnd(14530, 84573912) = 14528
+    #         BitwiseAnd(-14530, -84512) = -96992
+    #         BitwiseAnd(-5, -2) = -6
+    #         BitwiseAnd(-5, 7) = 3
+    #     ). Pass()
+    #     else. Fail()
 
-        Assert("Bitwise Or operations must provide expected values")
-        if (
-            BitwiseOr(5, 3) = 7
-            BitwiseOr(14530, 84573912) = 84573914
-            BitwiseOr(-14530, -84512) = -2050
-            BitwiseOr(-5, -2) = -1
-            BitwiseOr(-5, 7) = -1
-        ). Pass()
-        else. Fail()
+    #     Assert("Bitwise Or operations must provide expected values")
+    #     if (
+    #         BitwiseOr(5, 3) = 7
+    #         BitwiseOr(14530, 84573912) = 84573914
+    #         BitwiseOr(-14530, -84512) = -2050
+    #         BitwiseOr(-5, -2) = -1
+    #         BitwiseOr(-5, 7) = -1
+    #     ). Pass()
+    #     else. Fail()
 
-        Assert("Bitwise Xor operations must provide expected values")
-        if (
-            BitwiseXor(5, 3) = 6
-            BitwiseXor(14530, 84573912) = 84559386
-            BitwiseXor(-14530, -84512) = 94942
-            BitwiseXor(-5, -2) = 5
-            BitwiseXor(-5, 7) = -4
-        ). Pass()
-        else. Fail()
+    #     Assert("Bitwise Xor operations must provide expected values")
+    #     if (
+    #         BitwiseXor(5, 3) = 6
+    #         BitwiseXor(14530, 84573912) = 84559386
+    #         BitwiseXor(-14530, -84512) = 94942
+    #         BitwiseXor(-5, -2) = 5
+    #         BitwiseXor(-5, 7) = -4
+    #     ). Pass()
+    #     else. Fail()
 
-        Assert("Bitwise Not operations must provide expected values")
-        if (
-            BitwiseNot(5) = -6
-            BitwiseNot(14530) = -14531
-            BitwiseNot(-14530) = 14529
-            BitwiseNot(-5) = 4
-            BitwiseNot(7) = -8
-        ). Pass()
-        else. Fail()
+    #     Assert("Bitwise Not operations must provide expected values")
+    #     if (
+    #         BitwiseNot(5) = -6
+    #         BitwiseNot(14530) = -14531
+    #         BitwiseNot(-14530) = 14529
+    #         BitwiseNot(-5) = 4
+    #         BitwiseNot(7) = -8
+    #     ). Pass()
+    #     else. Fail()
 
-        Assert("Arithmetic left shift operations must provide expected values")
-        if (
-            LeftShift(5, 2) = 20
-            LeftShift(-5, 2) = -20
-            LeftShift(14530, 3) = 116240
-            LeftShift(-14530, 6) = -929920
-            LeftShift(-14530, -2) = -58120
-        ). Pass()
-        else. Fail()
+    #     Assert("Arithmetic left shift operations must provide expected values")
+    #     if (
+    #         LeftShift(5, 2) = 20
+    #         LeftShift(-5, 2) = -20
+    #         LeftShift(14530, 3) = 116240
+    #         LeftShift(-14530, 6) = -929920
+    #         LeftShift(-14530, -2) = -58120
+    #     ). Pass()
+    #     else. Fail()
 
-        Assert("Right shift operations must provide expected values")
-        if (
-            RightShift(5, 2) = 1
-            RightShift(-5, 2) = -2
-            RightShift(14530, 3) = 1816
-            RightShift(-14530, 6) = -228
-            RightShift(-14530, -2) = -3633
-        ). Pass()
-        else. Fail()
+    #     Assert("Right shift operations must provide expected values")
+    #     if (
+    #         RightShift(5, 2) = 1
+    #         RightShift(-5, 2) = -2
+    #         RightShift(14530, 3) = 1816
+    #         RightShift(-14530, 6) = -228
+    #         RightShift(-14530, -2) = -3633
+    #     ). Pass()
+    #     else. Fail()
 
-        Assert("Logical Right shift operations must provide expected values")
-        if (
-            LogicalRightShift(5, 2) = 1
-            LogicalRightShift(-5, 2) = 1073741822
-            LogicalRightShift(14530, 3) = 1816
-            LogicalRightShift(-14530, 6) = 67108636
-            LogicalRightShift(-14530, -2) = 1073738191
-        ). Pass()
-        else. Fail()
-    }
+    #     Assert("Logical Right shift operations must provide expected values")
+    #     if (
+    #         LogicalRightShift(5, 2) = 1
+    #         LogicalRightShift(-5, 2) = 1073741822
+    #         LogicalRightShift(14530, 3) = 1816
+    #         LogicalRightShift(-14530, 6) = 67108636
+    #         LogicalRightShift(-14530, -2) = 1073738191
+    #     ). Pass()
+    #     else. Fail()
+    # }
 }

@@ -1,0 +1,318 @@
+using. StringManipulation
+using. VerseFeatures
+
+# Package token defines constants representing the lexical tokens of the Go
+# programming language and basic operations on tokens (printing, predicates).
+
+# token is the set of lexical tokens of the Go programming language.
+token<internal> := int
+
+### The list of tokens.
+# Special Tokens
+# INDEX START = iota
+ILLEGAL<internal> : token = 0
+EOF<internal> : token = 1
+COMMENT<internal> : token = 2
+
+_literal_beg<internal> : token = 3
+# Identifiers and basic type literals
+# (these tokens stand for classes of literals)
+IDENT<internal> : token = 4 # main
+INT<internal> : token = 5 # 12345
+FLOAT<internal> : token = 6 # 123.45
+IMAG<internal> : token = 7 # 123.45i
+CHAR<internal> : token = 8 # 'a'
+STRING<internal> : token = 9 # "abc"
+_literal_end<internal> : token = 10
+
+_operator_beg<internal> : token = 11
+# Operators and delimiters
+ADD<internal> : token = 12 # +
+SUB<internal> : token = 13 # -
+MUL<internal> : token = 14 # *
+QUO<internal> : token = 15 # /
+REM<internal> : token = 16 # %
+
+AND<internal> : token = 17 # &
+OR<internal> : token = 18 # |
+XOR<internal> : token = 19 # ^
+SHL<internal> : token = 20 # <<
+SHR<internal> : token = 21 # >>
+AND_NOT<internal> : token = 22 # &^
+
+ADD_ASSIGN<internal> : token = 23 # +=
+SUB_ASSIGN<internal> : token = 24 # -=
+MUL_ASSIGN<internal> : token = 25 # *=
+QUO_ASSIGN<internal> : token = 26 # /=
+REM_ASSIGN<internal> : token = 27 # %=
+
+AND_ASSIGN<internal> : token = 28 # &=
+OR_ASSIGN<internal> : token = 29 # |=
+XOR_ASSIGN<internal> : token = 30 # ^=
+SHL_ASSIGN<internal> : token = 31 # <<=
+SHR_ASSIGN<internal> : token = 32 # >>=
+AND_NOT_ASSIGN<internal> : token = 33 # &^=
+
+LAND<internal> : token = 34 # &&
+LOR<internal> : token = 35 # ||
+ARROW<internal> : token = 36 # <-
+INC<internal> : token = 37 # ++
+DEC<internal> : token = 38 # --
+
+EQL<internal> : token = 39 # ==
+LSS<internal> : token = 40 # <
+GTR<internal> : token = 41 # >
+ASSIGN<internal> : token = 42 # =
+NOT<internal> : token = 43 # !
+
+NEQ<internal> : token = 44 # !=
+LEQ<internal> : token = 45 # <=
+GEQ<internal> : token = 46 # >=
+DEFINE<internal> : token = 47 # :=
+ELLIPSIS<internal> : token = 48 # ...
+
+LPAREN<internal> : token = 49 # (
+LBRACK<internal> : token = 50 # [
+LBRACE<internal> : token = 51 # {
+COMMA<internal> : token = 52 # ,
+PERIOD<internal> : token = 53 # .
+
+RPAREN<internal> : token = 54 # )
+RBRACK<internal> : token = 55 # ]
+RBRACE<internal> : token = 56 # }
+SEMICOLON<internal> : token = 57 # ;
+COLON<internal> : token = 58 # :
+_operator_end<internal> : token = 59
+
+_keyword_beg<internal> : token = 60
+# Keywords
+BREAK<internal> : token = 61
+CASE<internal> : token = 62
+CHAN<internal> : token = 63
+CONST<internal> : token = 64
+CONTINUE<internal> : token = 65
+
+DEFAULT<internal> : token = 66
+DEFER<internal> : token = 67
+ELSE<internal> : token = 68
+FALLTHROUGH<internal> : token = 69
+FOR<internal> : token = 70
+
+FUNC<internal> : token = 71
+GO<internal> : token = 72
+GOTO<internal> : token = 73
+IF<internal> : token = 74
+IMPORT<internal> : token = 75
+
+INTERFACE<internal> : token = 76
+MAP<internal> : token = 77
+PACKAGE<internal> : token = 78
+RANGE<internal> : token = 79
+RETURN<internal> : token = 80
+
+SELECT<internal> : token = 81
+STRUCT<internal> : token = 82
+SWITCH<internal> : token = 83
+TYPE<internal> : token = 84
+VAR<internal> : token = 85
+_keyword_end<internal> : token = 86
+
+_additional_beg<internal> : token = 87
+# additional tokens, handled in an ad-hoc manner
+TILDE<internal> : token = 88
+_additional_end<internal> : token = 89
+
+tokens<internal> : [int]string = map{
+    ILLEGAL => "ILLEGAL"
+
+    EOF => "EOF"
+    COMMENT => "COMMENT"
+
+    IDENT => "IDENT"
+    INT => "INT"
+    FLOAT => "FLOAT"
+    IMAG => "IMAG"
+    CHAR => "CHAR"
+    STRING => "STRING"
+
+    ADD => "+"
+    SUB => "-"
+    MUL => "*"
+    QUO => "/"
+    REM => "%"
+
+    AND => "&"
+    OR => "|"
+    XOR => "^"
+    SHL => "<<"
+    SHR => ">>"
+    AND_NOT => "&^"
+
+    ADD_ASSIGN => "+="
+    SUB_ASSIGN => "-="
+    MUL_ASSIGN => "*="
+    QUO_ASSIGN => "/="
+    REM_ASSIGN => "%="
+
+    AND_ASSIGN => "&="
+    OR_ASSIGN => "|="
+    XOR_ASSIGN => "^="
+    SHL_ASSIGN => "<<="
+    SHR_ASSIGN => ">>="
+    AND_NOT_ASSIGN => "&^="
+
+    LAND => "&&"
+    LOR => "||"
+    ARROW => "<-"
+    INC => "++"
+    DEC => "--"
+
+    EQL => "=="
+    LSS => "<"
+    GTR => ">"
+    ASSIGN => "="
+    NOT => "!"
+
+    NEQ => "!="
+    LEQ => "<="
+    GEQ => ">="
+    DEFINE => ":="
+    ELLIPSIS => "..."
+
+    LPAREN => "("
+    LBRACK => "["
+    LBRACE => "\{"
+    COMMA => ","
+    PERIOD => "."
+
+    RPAREN => ")"
+    RBRACK => "]"
+    RBRACE => "\}"
+    SEMICOLON => ";"
+    COLON => ":"
+
+    BREAK => "break"
+    CASE => "case"
+    CHAN => "chan"
+    CONST => "const"
+    CONTINUE => "continue"
+
+    DEFAULT => "default"
+    DEFER => "defer"
+    ELSE => "else"
+    FALLTHROUGH => "fallthrough"
+    FOR => "for"
+
+    FUNC => "func"
+    GO => "go"
+    GOTO => "goto"
+    IF => "if"
+    IMPORT => "import"
+
+    INTERFACE => "interface"
+    MAP => "map"
+    PACKAGE => "package"
+    RANGE => "range"
+    RETURN => "return"
+
+    SELECT => "select"
+    STRUCT => "struct"
+    SWITCH => "switch"
+    TYPE => "type"
+    VAR => "var"
+
+    TILDE => "~"
+}
+
+# Returns the string corresponding to the given token.
+# For operators, delimiters, and keywords the string is the actual
+# token character sequence (e.g., for the token [ADD], the string is
+# "+"). For all other tokens the string corresponds to the token
+# constant name (e.g. for the token [IDENT], the string is "IDENT").
+(_Token:token).String<public>()<computes>:string = {
+    tokens[_Token] or "Token({_Token})"
+}
+
+# A set of constants for precedence-based expression parsing.
+# Non-operators have lowest precedence, followed by operators
+# starting with precedence 1 up to unary operators. The highest
+# precedence serves as "catch-all" precedence for selector,
+# indexing, and other operator and delimiter tokens.
+LowestPrec<internal> : int = 0
+UnaryPrec<internal> : int = 6
+HighestPrec<internal> : int = 7
+
+# Precedence returns the operator precedence of the binary
+# operator. If it is not a binary operator, the result
+# is LowestPrecedence.
+(Operator:token).Precedence<internal>()<computes>:int = {
+    if (Operator = LOR). return 1
+    if (Operator = LAND). return 2
+    if (array{EQL, NEQ, LSS, LEQ, GTR, GEQ}.Find[Operator]). return 3
+    if (array{ADD, SUB, OR, XOR}.Find[Operator]). return 4
+    if (array{MUL, QUO, REM, SHL, SHR, AND, AND_NOT}.Find[Operator]). return 5
+    return LowestPrec
+}
+
+# keywords<internal> : [string]token = Concatenate(for (
+#         Index := keyword_beg+1..keyword_end-1
+#         Keyword := tokens[Index]
+#     ) {
+#     map{Keyword => Index}
+# })
+
+# Lookup maps an identifier to its keyword token or [IDENT] (if not a keyword).
+Lookup<internal>(Identifier:string)<transacts>:token = {
+    _Token := (
+        KeywordIndex := tokens.FindKeyByValue[Identifier]
+        KeywordIndex > _keyword_beg
+        KeywordIndex < _keyword_end
+    ) or IDENT
+    return _Token
+}
+
+# IsLiteral returns true for tokens corresponding to identifiers
+# and basic type literals; it returns false otherwise.
+(_Token:token).IsLiteral<internal>()<computes><decides>:void = {
+    _Token > _literal_beg
+    _Token < _literal_end
+}
+
+# IsOperator returns true for tokens corresponding to operators and
+# delimiters; it returns false otherwise.
+(_Token:token).IsOperator<internal>()<computes><decides>:void = {
+    _Token > _operator_beg
+    _Token < _operator_end
+}
+
+# IsKeyword returns true for tokens corresponding to keywords;
+# it returns false otherwise.
+(_Token:token).IsKeyword<internal>()<computes><decides>:void = {
+    _Token > _keyword_beg
+    _Token < _keyword_end
+}
+
+# IsExported reports whether name starts with an upper-case letter.
+IsExported<public>(Name:string)<computes><decides>:void = {
+    uppercase_alphabet_characters_range[PrintableCharacters[Name[0]]]
+}
+
+# IsKeyword reports whether name is a Go keyword, such as "func" or "return".
+IsKeyword<internal>(Name:string)<decides><transacts>:void = {
+    Lookup(Name) <> IDENT
+}
+
+# IsIdentifier reports whether name is a Go identifier, that is, a non-empty
+# string made up of letters, digits, and underscores, where the first character
+# is not a digit. Keywords are not identifiers.
+IsIdentifier<internal>(Name:string)<decides><transacts>:void = {
+    Name <> ""
+    not IsKeyword[Name]
+    
+    for (Index->Character : Name) {
+        CharacterString := "{Character}"
+        CharacterCode := PrintableCharacters[CharacterString]
+        if (Index = 0). not numeric_characters_range[CharacterCode]
+        alphabet_characters_range[CharacterCode] or CharacterString = "_"
+    }
+}

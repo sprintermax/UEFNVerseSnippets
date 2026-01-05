@@ -1,0 +1,63 @@
+using. _EXPERIMENTS.PrimitiveTypes
+
+<#>
+    RangeTable defines a set of Unicode code points by listing the ranges of
+    code points within the set. The ranges are listed in two slices
+    to save space: a slice of 16-bit ranges and a slice of 32-bit ranges.
+    The two slices must be in sorted order and non-overlapping.
+    Also, R32 should contain only values >= 0x10000 (1<<16).
+range_table<public> := struct<computes> {
+    R16<public> : []range_16
+    R32<public> : []range_32 = array{}
+    LatinOffset<public> : int = 0 # number of entries in R16 with Hi <= MaxLatin1
+}
+
+<#>
+    Range16 represents of a range of 16-bit Unicode code points. The range runs from Lo to Hi
+    inclusive and has the specified stride.
+range_16<public> := struct<computes> {
+    (range_16:)Lo<public> : uint16
+    Hi<public> : uint16
+    Stride<public> : uint16
+}
+
+<#>
+    Range32 represents of a range of Unicode code points and is used when one or
+    more of the values will not fit in 16 bits. The range runs from Lo to Hi
+    inclusive and has the specified stride. Lo and Hi must always be >= 1<<16.
+range_32<public> := struct<computes> {
+    (range_32:)Lo<public> : uint32
+    Hi<public> : uint32
+    Stride<public> : uint32
+}
+
+<#>
+    CaseRange represents a range of Unicode code points for simple (one
+    code point to one code point) case conversion.
+    The range runs from Lo to Hi inclusive, with a fixed stride of 1. Deltas
+    are the number to add to the code point to reach the code point for a
+    different case for that character. They may be negative. If zero, it
+    means the character is in the corresponding case. There is a special
+    case representing sequences of alternating corresponding Upper and Lower
+    pairs. It appears with a fixed Delta of
+    
+        {UpperLower, UpperLower, UpperLower}
+    
+    The constant UpperLower has an otherwise impossible delta value.
+case_range<public> := struct<computes> {
+    (case_range:)Lo<public> : uint32
+    Hi<public> : uint32
+    Delta<public> : [<# MaxCase #>]rune
+}
+
+<#>
+    caseOrbit is defined in tables.go as []foldPair. Right now all the
+    entries fit in uint16, so use uint16. If that changes, compilation
+    will fail (the constants in the composite literal will not fit in uint16)
+    and the types here can change to uint32.
+fold_pair<public> := struct<computes> {
+    From<public> : uint16
+    To<public> : uint16
+}
+
+# WIP Functions

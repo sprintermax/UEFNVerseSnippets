@@ -1,0 +1,15 @@
+let x = 12;
+let y = 23;
+let foobar = 838383;
+let XX= 3;
+let YY = 5;
+
+let add = fn(x, y) { x + y };
+
+return x * y + 10
+
+return add(x,y);
+
+return 100;
+return x*y;
+return 100 + X + Y

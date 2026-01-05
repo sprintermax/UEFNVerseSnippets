@@ -1,0 +1,31 @@
+using. /Fortnite.com/Devices
+using. /Verse.org/Random
+using. /Verse.org/Simulation
+
+test_pratt_parsing_device<internal> := class<final>(creative_device) {
+    @editable_text_box{ MultiLine := true }
+    RawProgram<private>:string = ""
+
+    PrattEnvironment : environment = environment{}
+
+    OnBegin<override>()<suspends>:void = {
+        Lexer := MakeLexer(RawProgram)
+        Parser := MakeParser(Lexer)
+
+        _ParsedProgram := Parser.ParseProgram()
+        ParsedProgram := _ParsedProgram.GetSuccess[] or (
+            Error := _ParsedProgram.GetError[] or Err("Unreachable")
+            return Print(Error)
+        )
+
+        Print("Parsed Program: {ParsedProgram.MakeString()}")
+
+        _Evaluation := PrattEnvironment.Evaluate(ParsedProgram)
+        Evaluation := _Evaluation.GetSuccess[] or (
+            Error := _Evaluation.GetError[] or Err("Unreachable")
+            return Print(Error)
+        )
+
+        Print("Evaluation Result: {Evaluation.Inspect()}")
+    }
+}

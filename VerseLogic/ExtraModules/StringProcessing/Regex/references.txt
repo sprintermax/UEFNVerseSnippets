@@ -1,0 +1,8 @@
+https://github.com/dlclark/regexp2
+
+https://github.com/openresty/sregex
+
+https://github.com/unjs/magic-regexp
+https://github.com/express-validator/express-validator
+
+https://github.com/express-validator/express-validator/blob/24da8b7e1d06827df19f691f6be0e4bc0153225e/src/chain/validators.ts

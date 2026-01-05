@@ -1,0 +1,107 @@
+using. _EXPERIMENTS.PrimitiveTypes
+
+# Package utf8 implements functions and constants to support text encoded in
+# UTF-8. It includes functions to translate between runes and UTF-8 byte sequences.
+# See https://en.wikipedia.org/wiki/UTF-8
+
+# The conditions RuneError==unicode.ReplacementChar and
+# MaxRune==unicode.MaxRune are verified in the tests.
+# Defining them locally avoids this package depending on package unicode.
+
+# Constants<public> : [string]int = ConcatenateMaps(
+#     # Numbers fundamental to the encoding.
+#     map{
+#         "{0uFFFD}" => 65533 # the "error" Rune or "Unicode replacement character"
+#         "{0u80}" => 128 # characters below RuneSelf are represented as themselves in a single byte.
+#         # "{0u0010FFFF}" => 1114111 # Maximum valid Unicode code point.
+#     },
+#     map{}
+# )
+
+# Numbers fundamental to the encoding.
+RuneError<public> : rune = 0xFFFD
+RuneSelf<public> : uint8 = 0x80
+MaxRune<public> : rune = 0x0010FFFF
+UTFMax<public> : uint8 = 4
+
+# Code points in the surrogate range are not valid for UTF-8.
+surrogateMin<public> : uint16 = 0xD800
+surrogateMax<public> : uint16 = 0xDFFF
+
+t1<public> : uint8 = 0   # 0b00000000
+tx<public> : uint8 = 128 # 0b10000000
+t2<public> : uint8 = 192 # 0b11000000
+t3<public> : uint8 = 224 # 0b11100000
+t4<public> : uint8 = 240 # 0b11110000
+t5<public> : uint8 = 248 # 0b11111000
+
+maskx<public> : uint8 = 63 # 0b00111111
+mask2<public> : uint8 = 31 # 0b00011111
+mask3<public> : uint8 = 15 # 0b00001111
+mask4<public> : uint8 = 7  # 0b00000111
+
+rune1Max<public> : uint16 = 127   # 1 << 7 - 1
+rune2Max<public> : uint16 = 2047  # 1 << 11 - 1
+rune3Max<public> : uint16 = 65535 # 1 << 16 - 1
+
+# The default lowest and highest continuation byte.
+locb<public> : uint8 = 128 # 0b10000000
+hicb<public> : uint8 = 191 # 0b10111111
+
+# These names of these constants are chosen to give nice alignment in the
+# table below. The first nibble is an index into acceptRanges or F for
+# special one-byte cases. The second nibble is the Rune length or the
+# Status for the special one-byte case.
+xx<public> : uint8 = 0xF1  # invalid:  size 1
+_as<public> : uint8 = 0xF0 # ASCII:    size 1
+s1<public> : uint8 = 0x02  # accept 0, size 2
+s2<public> : uint8 = 0x13  # accept 1, size 3
+s3<public> : uint8 = 0x03  # accept 0, size 3
+s4<public> : uint8 = 0x23  # accept 2, size 3
+s5<public> : uint8 = 0x34  # accept 3, size 4
+s6<public> : uint8 = 0x04  # accept 0, size 4
+s7<public> : uint8 = 0x44  # accept 4, size 4
+
+runeErrorByte0<public> : rune = 239 # t3 | (RuneError >> 12)
+runeErrorByte1<public> : rune = 191 # tx | (RuneError >> 6) & maskx
+runeErrorByte2<public> : rune = 189 # tx | RuneError & maskx
+
+# first is information about the first byte in a UTF-8 sequence.
+_first<public> : []uint8 = array{
+	# 0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
+	_as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, # 0x00-0x0F
+	_as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, # 0x10-0x1F
+	_as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, # 0x20-0x2F
+	_as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, # 0x30-0x3F
+	_as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, # 0x40-0x4F
+	_as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, # 0x50-0x5F
+	_as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, # 0x60-0x6F
+	_as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, _as, # 0x70-0x7F
+	# 0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
+	xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  # 0x80-0x8F
+	xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  # 0x90-0x9F
+	xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  # 0xA0-0xAF
+	xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  # 0xB0-0xBF
+	xx,  xx,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  # 0xC0-0xCF
+	s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  s1,  # 0xD0-0xDF
+	s2,  s3,  s3,  s3,  s3,  s3,  s3,  s3,  s3,  s3,  s3,  s3,  s3,  s4,  s3,  s3,  # 0xE0-0xEF
+	s5,  s6,  s6,  s6,  s7,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx,  xx   # 0xF0-0xFF
+}
+
+# acceptRange gives the range of valid values for the second byte in a UTF-8
+# sequence.
+accept_range<public> := struct<computes> {
+    Lo<public> : uint8 # lowest value for second byte.
+    Hi<public> : uint8 # highest value for second byte.
+}
+
+# acceptRanges has size 16 to avoid bounds checks in the code that uses it.
+acceptRanges<public> : []accept_range = array{
+    accept_range{ Lo := locb, Hi := hicb }
+    accept_range{ Lo := 0xA0, Hi := hicb }
+    accept_range{ Lo := locb, Hi := 0x9F }
+    accept_range{ Lo := 0x90, Hi := hicb }
+    accept_range{ Lo := locb, Hi := 0x8F }
+}
+
+# WIP Functions

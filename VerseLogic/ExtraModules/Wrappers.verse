@@ -119,8 +119,7 @@ Wrappers<public> := module {
     ) {
         EmitEvent<private> : event(t) = event(t){}
 
-        # `SubscribeWith` naming is a temp fix for (local:) not being allowed in class scope to be able to use `(local:)Subscribe`
-        SubscribeWith<public>(Callback:type{_(:t):void}):subscription_task(t) = {
+        (subscribable_event:)Subscribe<public>(Callback:type{_(:t):void}):subscription_task(t) = {
             subscription_task(t) {
                 Callback := Callback
                 Proxy := EmitEvent

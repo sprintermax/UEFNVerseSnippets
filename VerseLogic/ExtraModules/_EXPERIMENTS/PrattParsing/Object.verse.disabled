@@ -1,0 +1,171 @@
+using. VerseFeatures
+
+object<public> := interface<internal> {
+    GetType<internal>()<computes>:string
+
+    Inspect<public>()<computes>:string
+}
+
+BuiltInObjects<internal> : [string]string = map{
+    "INTEGER_OBJECT"                 => "INTEGER"
+    "BOOLEAN_OBJECT"                 => "BOOLEAN"
+    "NULL_OBJECT"                    => "NULL"
+    "RETURN_VALUE_OBJECT"            => "RETURN_VALUE"
+    "ERROR_OBJECT"                   => "ERROR"
+    "FUNCTION_OBJECT"                => "FUNCTION"
+    "STRING_OBJECT"                  => "STRING"
+    "BUILTIN_FUNCTION_OBJECT"        => "BUILTIN"
+    "ARRAY_OBJECT"                   => "ARRAY"
+    "HASH_OBJECT"                    => "HASH"
+}
+
+integer_object<internal> := class<internal><computes>(object, hashable) {
+    Value<internal> : int
+
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["INTEGER_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+        "{Self.Value}"
+    }
+
+    HashKey<override>()<computes>:string = {
+        "{Self.GetType()}_{Self.Value}"
+    }
+}
+
+boolean_object<internal> := class<internal><computes>(object, hashable) {
+    Value<internal> : logic
+
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["BOOLEAN_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+        "{Self.Value}"
+    }
+
+    HashKey<override>()<computes>:string = {
+        "{Self.GetType()}_{Self.Value}"
+    }
+}
+
+null_object<internal> := class<internal><computes>(object) {
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["NULL_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+        ""
+    }
+}
+
+return_value_object<internal> := class<internal><computes>(object) {
+    Value<internal> : object
+
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["RETURN_VALUE_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+        Self.Value.Inspect()
+    }
+}
+
+error_object<internal> := class<internal><computes>(object) {
+    Message<internal> : string
+
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["ERROR_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+        "ERROR: {Self.Message}"
+    }
+}
+
+function_object<internal> := class<internal><computes>(object) {
+    Parameters<internal> : []identifier_expression_node
+    Body<internal> : block_statement_node
+    # Env<internal> : environment # WIP
+
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["FUNCTION_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+
+        ParametersLength := Parameters.Length
+
+        ParameterStrings := for (Parameter : Self.Parameters) {
+            "{Parameter}"
+        }
+
+        "fn({Join(ParameterStrings, ", ")}) \{\n{Body}\n\}"
+    }
+}
+
+string_object<internal> := class<internal><computes>(object, hashable) {
+    Value<internal> : string
+
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["STRING_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+        Self.Value
+    }
+
+    HashKey<override>()<computes>:string = {
+        "{Self.GetType()}_{Self.Value}"
+    }
+}
+
+builtin_function_object<internal> := class<internal><computes>(object) {
+    Function<internal> : type{_(:[]object):result(object, string)}
+
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["BUILTIN_FUNCTION_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+        "builtin function"
+    }
+}
+
+array_object<internal> := class<internal><computes>(object) {
+    Elements<internal> : []object
+
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["ARRAY_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+        ElementStrings := for (Element : Self.Elements) {
+            "{Element.Inspect()}"
+        }
+
+        "[{Join(ElementStrings, ", ")}]"
+    }
+}
+
+hashable<internal> := interface<internal> {
+    HashKey<internal>()<computes>:string
+}
+
+hash_object<internal> := class<internal><computes>(object) {
+    Pairs<internal> : [string]object
+
+    GetType<override>()<computes>:string = {
+        BuiltInObjects["HASH_OBJECT"] or Err("Unreachable")
+    }
+
+    Inspect<override>()<computes>:string = {
+        PairStrings := for (Key->Value : Pairs) {
+            "{Key}:{Value.Inspect()}"
+        }
+
+        "\{{Join(PairStrings, ", ")}\}"
+    }
+}

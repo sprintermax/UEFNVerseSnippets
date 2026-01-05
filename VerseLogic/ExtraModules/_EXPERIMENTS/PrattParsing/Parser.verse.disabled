@@ -1,0 +1,655 @@
+prefix_parse_function := type{_():result(expression_node, string)}
+infix_parse_function := type{_(:expression_node):result(expression_node, string)}
+
+TokenPrecedences<internal> : [string]int = map{
+    # LOWEST                 = 10
+    "EQUAL"                 => 20
+    "NOT_EQUAL"             => 20
+    "LESS_THAN"             => 30
+    "LESS_THAN_EQUAL"       => 30
+    "GREATER_THAN"          => 30
+    "GREATER_THAN_EQUAL"    => 30
+    "PLUS"                  => 40
+    "MINUS"                 => 40
+    "SLASH"                 => 50
+    "ASTERISK"              => 50
+    # PREFIX                 = 60
+    "LEFT_PARENTHESIS"      => 70
+    "LEFT_BRACKET"          => 80
+}
+
+MakeParser<public>(Lexer:lexer)<transacts>:parser = {
+    Parser := parser{ Lexer := Lexer }
+
+    Parser.NextToken()
+    Parser.NextToken()
+    
+    Parser.RegisterPrefix("IDENT", Parser.ParseIdentifier)
+    Parser.RegisterPrefix("INTEGER", Parser.ParseIntegerLiteral)
+    Parser.RegisterPrefix("NEGATE", Parser.ParsePrefixExpression)
+    Parser.RegisterPrefix("MINUS", Parser.ParsePrefixExpression)
+    Parser.RegisterPrefix("TRUE", Parser.ParseBoolean)
+    Parser.RegisterPrefix("FALSE", Parser.ParseBoolean)
+    Parser.RegisterPrefix("LEFT_PARENTHESIS", Parser.ParseGroupedExpression)
+    Parser.RegisterPrefix("IF", Parser.ParseIfExpression)
+    Parser.RegisterPrefix("FUNCTION", Parser.ParseFunctionLiteral)
+    Parser.RegisterPrefix("STRING", Parser.ParseStringLiteral)
+    Parser.RegisterPrefix("LEFT_BRACKET", Parser.ParseArrayLiteral)
+    Parser.RegisterPrefix("LEFT_BRACE", Parser.ParseHashLiteral)
+
+    Parser.RegisterInfix("PLUS", Parser.ParseInfixExpression)
+    Parser.RegisterInfix("MINUS", Parser.ParseInfixExpression)
+    Parser.RegisterInfix("SLASH", Parser.ParseInfixExpression)
+    Parser.RegisterInfix("ASTERISK", Parser.ParseInfixExpression)
+    Parser.RegisterInfix("EQUAL", Parser.ParseInfixExpression)
+    Parser.RegisterInfix("NOT_EQUAL", Parser.ParseInfixExpression)
+    Parser.RegisterInfix("LESS_THAN", Parser.ParseInfixExpression)
+    Parser.RegisterInfix("GREATER_THAN", Parser.ParseInfixExpression)
+    Parser.RegisterInfix("LEFT_PARENTHESIS", Parser.ParseCallExpression)
+    Parser.RegisterInfix("LEFT_BRACKET", Parser.ParseIndexExpression)
+
+    Parser
+}
+
+parser<public> := class<internal><computes><allocates> {
+    Lexer<public> : lexer
+
+    var<private> CurrentToken<private> : token = token{
+        Literal := ""
+        Type := ""
+    }
+    var<private> PeekToken<private> : token = token{
+        Literal := ""
+        Type := ""
+    }
+    
+    var<private> PrefixParseFunctions<private> : [string]prefix_parse_function = map{}
+    var<private> InfixParseFunctions<private> : [string]infix_parse_function = map{}
+
+    NextToken<internal>()<transacts>:void = {
+        set Self.CurrentToken = Self.PeekToken
+        set Self.PeekToken = Self.Lexer.NextToken()
+    }
+
+    RegisterPrefix<internal>(TokenType:string, Function:prefix_parse_function)<transacts>:void = {
+        (set Self.PrefixParseFunctions[TokenType] = Function) or Err("Unreachable")
+    }
+
+    RegisterInfix<internal>(TokenType:string, Function:infix_parse_function)<transacts>:void = {
+        (set Self.InfixParseFunctions[TokenType] = Function) or Err("Unreachable")
+    }
+
+    ParseProgram<public>():result(program_node, string) = {
+        var Statements : []statement_node = array{}
+        
+        loop {
+            not Self.CurrentTokenAs["EOF"] or (break) # WIP VERIFY FUNCTIONALITY
+            _Statement := Self.ParseStatement()
+            Statement := _Statement.GetSuccess[] or (
+                Error := _Statement.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+            set Statements += array{Statement}
+            Self.NextToken()
+        }
+
+        MakeSuccess(program_node{
+            Token := token{
+                Literal := "PROG"
+                Type := "PROGG"
+            }
+            Statements := Statements
+        })
+    }
+
+    ParseStatement<private>():result(statement_node, string) = {
+        case (Self.CurrentToken.Type) {
+            "LET" => Self.ParseLetStatement()
+            "RETURN" => Self.ParseReturnStatement()
+            _ => Self.ParseExpressionStatement()
+        }
+    }
+
+    ParseLetStatement<private>():result(statement_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        block{
+            ExpectResult := Self.ExpectPeek("IDENT")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        Name := identifier_expression_node{
+            Token := Self.CurrentToken
+            Value := Self.CurrentToken.Literal
+        }
+
+        block{
+            ExpectResult := Self.ExpectPeek("ASSIGN")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        Self.NextToken()
+
+        _Value := Self.ParseExpression(10)
+        Value := _Value.GetSuccess[] or (
+            Error := _Value.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        option{
+            Self.PeekTokenAs["SEMICOLON"]
+            Self.NextToken()
+        }
+
+        MakeSuccess(let_statement_node{
+            Token := _CurrentToken
+            Name := Name
+            Value := Value
+        })
+    }
+
+    ParseReturnStatement<private>():result(statement_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        Self.NextToken()
+
+        _ReturnValue := Self.ParseExpression(10)
+        ReturnValue := _ReturnValue.GetSuccess[] or (
+            Error := _ReturnValue.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        option{
+            Self.PeekTokenAs["SEMICOLON"]
+            Self.NextToken()
+        }
+
+        MakeSuccess(return_statement_node{
+            Token := _CurrentToken
+            ReturnValue := ReturnValue
+        })
+    }
+
+    ParseExpressionStatement<private>():result(statement_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        _Expression := Self.ParseExpression(10)
+        Expression := _Expression.GetSuccess[] or (
+            Error := _Expression.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        option{
+            Self.PeekTokenAs["SEMICOLON"]
+            Self.NextToken()
+        }
+
+        MakeSuccess(expression_statement_node{
+            Token := _CurrentToken
+            Expression := Expression
+        })
+    }
+
+    PeekPrecedence<private>()<computes><reads>:int = {
+        TokenPrecedences[Self.PeekToken.Type] or 0
+    }
+
+    CurrentPrecedence<private>()<computes><reads>:int = {
+        TokenPrecedences[Self.CurrentToken.Type] or 0
+    }
+
+    ParsePrefixExpression<internal>():result(expression_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        Self.NextToken()
+
+        _Right := Self.ParseExpression(60)
+        Right := _Right.GetSuccess[] or (
+            Error := _Right.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        MakeSuccess(prefix_expression_node{
+            Token := _CurrentToken
+            Operator := _CurrentToken.Literal
+            Right := Right
+        })
+    }
+
+    ParseExpression<private>(Precedence:int):result(expression_node, string) = {
+
+        PrefixParseFunction := Self.PrefixParseFunctions[Self.CurrentToken.Type] or (
+            return MakeError("No prefix parse function for {Self.CurrentToken.Type} found")
+        )
+
+        var _LeftExpression : result(expression_node, string) = PrefixParseFunction()
+
+
+        loop {
+            not (not Self.PeekTokenAs["SEMICOLON"] and Precedence < Self.PeekPrecedence()) or (break)
+            InfixParseFunction := Self.InfixParseFunctions[Self.PeekToken.Type] or (break)
+
+            Self.NextToken()
+
+            LeftExpression := _LeftExpression.GetSuccess[] or (
+                Error := _LeftExpression.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            set _LeftExpression = InfixParseFunction(LeftExpression)
+        }
+
+        _LeftExpression
+    }
+
+    ParseInfixExpression<internal>(Left:expression_node):result(expression_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        Precedence := Self.CurrentPrecedence()
+
+        Self.NextToken()
+
+        _Right := Self.ParseExpression(Precedence)
+        Right := _Right.GetSuccess[] or (
+            Error := _Right.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        MakeSuccess(infix_expression_node{
+            Token := _CurrentToken
+            Operator := _CurrentToken.Literal
+            Left := Left
+            Right := Right
+        })
+    }
+
+    ParseIdentifier<internal>():result(expression_node, string) = {
+        MakeSuccess(identifier_expression_node{
+            Token := Self.CurrentToken
+            Value := Self.CurrentToken.Literal
+        })
+    }
+
+    ParseIntegerLiteral<internal>():result(expression_node, string) = {
+        LiteralValue := Self.CurrentToken.Literal
+
+        IntValue := StringManipulation.ParseInt[LiteralValue] or (
+            return MakeError("Could not parse {LiteralValue} as integer")
+        )
+
+        MakeSuccess(integer_literal_expression_node{
+            Token := Self.CurrentToken
+            Value := IntValue
+        })
+    }
+
+    ParseGroupedExpression<internal>():result(expression_node, string) = {
+        Self.NextToken()
+
+        _Expression := Self.ParseExpression(10)
+
+        block{
+            ExpectResult := Self.ExpectPeek("RIGHT_PARENTHESIS")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        _Expression
+    }
+
+    ParseBoolean<internal>():result(expression_node, string) = {
+
+        MakeSuccess(boolean_expression_node{
+            Token := Self.CurrentToken
+            Value := logic{Self.CurrentTokenAs["TRUE"]}
+        })
+    }
+
+    ParseIfExpression<internal>():result(expression_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        block{
+            ExpectResult := Self.ExpectPeek("LEFT_PARENTHESIS")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        Self.NextToken()
+
+        _Condition := Self.ParseExpression(10)
+        Condition := _Condition.GetSuccess[] or (
+            Error := _Condition.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        block{
+            ExpectResult := Self.ExpectPeek("RIGHT_PARENTHESIS")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        block{
+            ExpectResult := Self.ExpectPeek("LEFT_BRACE")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        _Consequence := Self.ParseBlockStatement()
+        Consequence := _Consequence.GetSuccess[] or (
+            Error := _Consequence.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        block{
+            ExpectResult := Self.ExpectPeek("ELSE")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeSuccess(if_expression_node{
+                    Token := Self.CurrentToken
+                    Condition := Condition
+                    Consequence := Consequence
+                    _Alternative := false
+                })
+            }
+        }
+
+        Self.NextToken()
+
+        block{
+            ExpectResult := Self.ExpectPeek("LEFT_BRACE")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        _Alternative := Self.ParseBlockStatement()
+        Alternative := _Alternative.GetSuccess[] or (
+            Error := _Alternative.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        MakeSuccess(if_expression_node{
+            Token := _CurrentToken
+            Condition := Condition
+            Consequence := Consequence
+            _Alternative := option{Alternative}
+        })
+    }
+
+    ParseBlockStatement<private>():result(block_statement_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        Self.NextToken()
+
+        MakeSuccess(block_statement_node{
+            Token := _CurrentToken
+            Statements := (
+                var Statements : []statement_node = array{}
+                loop {
+                    if (Self.CurrentTokenAs["RIGHT_BRACE"] or Self.CurrentTokenAs["EOF"]) { break }
+                    Statement := Self.ParseStatement()
+                    option{
+                        set Statements += array{Statement.GetSuccess[]}
+                    }
+                    Self.NextToken()
+                }
+                Statements
+            )
+        })
+    }
+
+    ParseFunctionLiteral<internal>():result(expression_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        Print("ParseFunctionLiteral start - Current: {Self.CurrentToken.Type}|{Self.CurrentToken.Literal}, Peek: {Self.PeekToken.Type}|{Self.PeekToken.Literal}")
+
+        block{
+            ExpectResult := Self.ExpectPeek("LEFT_PARENTHESIS")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        Print("After ExpectPeek LEFT_PARENTHESIS - Current: {Self.CurrentToken.Type}|{Self.CurrentToken.Literal}, Peek: {Self.PeekToken.Type}|{Self.PeekToken.Literal}")
+
+        _Parameters := Self.ParseFunctionParameters()
+        Parameters := _Parameters.GetSuccess[] or (
+            Error := _Parameters.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        Print("After ParseFunctionParameters - Current: {Self.CurrentToken.Type}|{Self.CurrentToken.Literal}, Peek: {Self.PeekToken.Type}|{Self.PeekToken.Literal}")
+
+        block{
+            ExpectResult := Self.ExpectPeek("LEFT_BRACE")
+            if (Error := ExpectResult.GetError[]) {
+                Print("ERROR expecting LEFT_BRACE: {Error}")
+                return MakeError(Error)
+            }
+        }
+
+        _Body := Self.ParseBlockStatement()
+        Body := _Body.GetSuccess[] or (
+            Error := _Body.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        MakeSuccess(function_literal_expression_node{
+            Token := _CurrentToken
+            Parameters := Parameters
+            Body := Body
+        })
+    }
+
+    ParseFunctionParameters<private>():result([]identifier_expression_node, string) = {
+        var Identifiers : []identifier_expression_node = array{}
+
+        if (Self.PeekTokenAs["RIGHT_PARENTHESIS"]) {
+            Self.NextToken()
+            return MakeSuccess(Identifiers)
+        }
+
+        Self.NextToken()
+
+        set Identifiers += array{identifier_expression_node{
+            Token := Self.CurrentToken
+            Value := Self.CurrentToken.Literal
+        }}
+
+        loop {
+            Self.PeekTokenAs["COMMA"] or (break)
+            Self.NextToken()
+            Self.NextToken()
+
+            set Identifiers += array{identifier_expression_node{
+                Token := Self.CurrentToken
+                Value := Self.CurrentToken.Literal
+            }}
+        }
+
+        block{
+            ExpectResult := Self.ExpectPeek("RIGHT_PARENTHESIS")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        MakeSuccess(Identifiers)
+    }
+
+    ParseCallExpression<internal>(Function:expression_node):result(expression_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        _Arguments := Self.ParseExpressionList("RIGHT_PARENTHESIS")
+        Arguments := _Arguments.GetSuccess[] or (
+                Error := _Arguments.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+        MakeSuccess(call_expression_node{
+            Token := _CurrentToken
+            Function := Function
+            Arguments := Arguments
+        })
+    }
+
+    CurrentTokenAs<private>(Type:string)<computes><decides><reads>:void = {
+        Self.CurrentToken.Type = Type
+    }
+
+    PeekTokenAs<private>(Type:string)<computes><decides><reads>:void = {
+        Self.PeekToken.Type = Type
+    }
+
+    ExpectPeek<private>(Type:string):result(void, string) = {
+        if (PeekTokenAs[Type]) {
+            Self.NextToken()
+            MakeSuccess()
+        } else {
+            MakeError("Expected next token to be {Type}, got {Self.PeekToken.Type} instead")
+        }
+    }
+
+    ParseStringLiteral<internal>():result(expression_node, string) = {
+        MakeSuccess(string_literal_expression_node{
+            Token := Self.CurrentToken
+            Value := Self.CurrentToken.Literal
+        })
+    }
+
+    ParseExpressionList<private>(EndTokenType:string):result([]expression_node, string) = {
+        var Expressions : []expression_node = array{}
+
+        if (Self.PeekTokenAs[EndTokenType]) {
+            Self.NextToken()
+            return MakeSuccess(Expressions)
+        }
+
+        Self.NextToken()
+
+        block{
+            _Expression := Self.ParseExpression(10)
+            Expression := _Expression.GetSuccess[] or (
+                Error := _Expression.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+            set Expressions += array{Expression}
+        }
+
+        loop {
+            Self.PeekTokenAs["COMMA"] or (break)
+            Self.NextToken()
+            Self.NextToken()
+            block{
+                _Expression := Self.ParseExpression(10)
+                Expression := _Expression.GetSuccess[] or (
+                    Error := _Expression.GetError[] or Err("Unreachable")
+                    return MakeError(Error)
+                )
+                set Expressions += array{Expression}
+            }
+        }
+
+        block{
+            ExpectResult := Self.ExpectPeek(EndTokenType)
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        MakeSuccess(Expressions)
+    }
+
+    ParseArrayLiteral<internal>():result(expression_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        _Elements := Self.ParseExpressionList("RIGHT_BRACKET")
+        Elements := _Elements.GetSuccess[] or (
+            Error := _Elements.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        MakeSuccess(array_literal_expression_node{
+            Token := _CurrentToken
+            Elements := Elements
+        })
+    }
+
+    ParseIndexExpression<internal>(Left:expression_node):result(expression_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        Self.NextToken()
+
+        _Index := Self.ParseExpression(10)
+        Index := _Index.GetSuccess[] or (
+            Error := _Index.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        block{
+            ExpectResult := Self.ExpectPeek("RIGHT_BRACKET")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        MakeSuccess(index_expression_node{
+            Token := _CurrentToken
+            Left := Left
+            Index := Index
+        })
+    }
+
+    ParseHashLiteral<internal>():result(expression_node, string) = {
+        _CurrentToken := Self.CurrentToken
+
+        var Pairs : [expression_node]expression_node = map{}
+
+        loop {
+            not Self.PeekTokenAs["RIGHT_BRACE"] or (break)
+            Self.NextToken()
+
+            _Key := Self.ParseExpression(10)
+            Key := _Key.GetSuccess[] or (
+                Error := _Key.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            Self.NextToken()
+
+            _Value := Self.ParseExpression(10)
+            Value := _Value.GetSuccess[] or (
+                Error := _Value.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            (set Pairs[Key] = Value) or Err("Unreachable")
+
+            block{
+                ExpectResult := Self.ExpectPeek("COMMA")
+                if (not Self.PeekTokenAs["RIGHT_BRACE"], Error := ExpectResult.GetError[]) {
+                    return MakeError(Error)
+                }
+            }
+        }
+
+        block{
+            ExpectResult := Self.ExpectPeek("RIGHT_BRACE")
+            if (Error := ExpectResult.GetError[]) {
+                return MakeError(Error)
+            }
+        }
+
+        MakeSuccess(hash_literal_expression_node{
+            Token := _CurrentToken
+            Pairs := Pairs
+        })
+    }
+}

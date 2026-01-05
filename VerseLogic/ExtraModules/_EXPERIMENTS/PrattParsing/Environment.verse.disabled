@@ -1,0 +1,354 @@
+environment<public> := class<public><computes><allocates> {
+    var<private> Store<internal> : [string]object = map{}
+    var<private> Outer<internal> : ?environment = false
+
+    Get<internal>(Name:string)<computes><decides><reads>:object = {
+        Store[Name] or Outer?.Get[Name]
+    }
+
+    Set<internal>(Name:string, Value:object)<transacts>:void = {
+        (set Self.Store[Name] = Value) or Err("Unreachable")
+    }
+
+    NewEnclosedEnvironment<internal>()<transacts>:environment = {
+        Environment := environment{
+            Outer := option{Self}
+        }
+    }
+
+    Evaluate<public>(Node:node):result(object, string) = {
+        if (ProgramNode := program_node[Node]). return Self.EvaluateStatements(ProgramNode.Statements)
+        else if (ExpressionStatementNode := expression_statement_node[Node]). return Self.Evaluate(ExpressionStatementNode.Expression)
+        else if (IntegerLiteralExpressionNode := integer_literal_expression_node[Node]). return MakeSuccess(integer_object{Value := IntegerLiteralExpressionNode.Value})
+        else if (BooleanExpressionNode := boolean_expression_node[Node]). return MakeSuccess(boolean_object{Value := BooleanExpressionNode.Value})
+        else if (PrefixExpressionNode := prefix_expression_node[Node]) {
+            
+            _Right := Self.Evaluate(PrefixExpressionNode.Right)
+            Right := _Right.GetSuccess[] or (
+                Error := _Right.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            return Self.EvaluatePrefixExpression(PrefixExpressionNode.Operator, Right)
+
+        } else if (InfixExpressionNode := infix_expression_node[Node]) {
+            
+            _Left := Self.Evaluate(InfixExpressionNode.Left)
+            Left := _Left.GetSuccess[] or (
+                Error := _Left.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            _Right := Self.Evaluate(InfixExpressionNode.Right)
+            Right := _Right.GetSuccess[] or (
+                Error := _Right.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            return Self.EvaluateInfixExpression(InfixExpressionNode.Operator, Left, Right)
+
+        } else if (IfExpressionNode := if_expression_node[Node]). return Self.EvaluateIfExpression(IfExpressionNode)
+        else if (BlockStatementNode := block_statement_node[Node]). return Self.EvaluateBlockStatement(BlockStatementNode)
+        else if (ReturnStatementNode := return_statement_node[Node]). return Self.EvaluateReturnStatement(ReturnStatementNode.ReturnValue)
+        else if (LetStatementNode := let_statement_node[Node]) {
+            
+            _Value := Self.Evaluate(LetStatementNode.Value)
+            Value := _Value.GetSuccess[] or (
+                Error := _Value.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            Self.Set(LetStatementNode.Name.Value, Value)
+            return MakeSuccess(null_object{})
+            # WIP NEEDS RETURN?
+
+        } else if (IdentifierExpressionNode := identifier_expression_node[Node]). return Self.EvaluateIdentifier(IdentifierExpressionNode)
+        else if (FunctionLiteralExpressionNode := function_literal_expression_node[Node]). return MakeSuccess(function_object{Parameters := FunctionLiteralExpressionNode.Parameters, Body := FunctionLiteralExpressionNode.Body})
+        else if (CallExpressionNode := call_expression_node[Node]) {
+            
+            _Function := Self.Evaluate(CallExpressionNode.Function)
+            Function := _Function.GetSuccess[] or (
+                Error := _Function.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            _Args := EvaluateExpressions(CallExpressionNode.Arguments)
+            Args := _Args.GetSuccess[] or (
+                Error := _Args.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            return Self.ApplyFunction(Function, Args)
+
+        } else if (StringLiteralExpressionNode := string_literal_expression_node[Node]). return MakeSuccess(string_object{Value := StringLiteralExpressionNode.Value})
+        else if (ArrayLiteralExpressionNode := array_literal_expression_node[Node]) {
+            
+            _Elements := EvaluateExpressions(ArrayLiteralExpressionNode.Elements)
+            Elements := _Elements.GetSuccess[] or (
+                Error := _Elements.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            return MakeSuccess(array_object{Elements := Elements})
+
+        } else if (IndexExpressionNode := index_expression_node[Node]) {
+            
+            _Left := Self.Evaluate(IndexExpressionNode.Left)
+            Left := _Left.GetSuccess[] or (
+                Error := _Left.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            _Index := Self.Evaluate(IndexExpressionNode.Index)
+            Index := _Index.GetSuccess[] or (
+                Error := _Index.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            return Self.EvaluateIndexExpression(Left, Index)
+
+        } else if (HashLiteralExpressionNode := hash_literal_expression_node[Node]). return Self.EvaluateHashLiteral(HashLiteralExpressionNode)
+
+        MakeError("Failed to Evaluate Node of Unknown Type")
+    }
+
+    EvaluateStatements<private>(Statements:[]statement_node):result(object, string) = {
+        var Result : object = null_object{}
+
+        for (Statement : Statements) {
+            _EvaluationResult := Self.Evaluate(Statement)
+            EvaluationResult := _EvaluationResult.GetSuccess[] or (
+                Error := _EvaluationResult.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            if (ReturnValueEvaluationResult := return_value_object[EvaluationResult]). return MakeSuccess(ReturnValueEvaluationResult.Value)
+            else if (ErrorEvaluationResult := error_object[EvaluationResult]). return MakeSuccess(ErrorEvaluationResult)
+        }
+
+        MakeSuccess(Result)
+    }
+
+    EvaluatePrefixExpression<private>(Operator:string, Right:object):result(object, string) = {
+        case (Operator) {
+            "!" => Self.EvaluateBangOperatorExpression(Right)
+            "-" => Self.EvaluateMinusPrefixOperatorExpression(Right)
+            _ => MakeError("Unknown Prefix Operator: {Operator}")
+        }
+    }
+
+    EvaluateBangOperatorExpression<private>(Right:object):result(object, string) = {
+        if (BooleanObject := boolean_object[Right]) {
+            case (BooleanObject.Value) {
+                true => return MakeSuccess(boolean_object{Value := false})
+                false => return MakeSuccess(boolean_object{Value := true})
+                _ => Err("Unreachable")
+            }
+        } else if (NullObject := null_object[Right]). return MakeSuccess(boolean_object{Value := true})
+
+        return MakeSuccess(boolean_object{Value := false})
+    }
+
+    EvaluateMinusPrefixOperatorExpression<private>(Right:object):result(object, string) = {
+        Value := integer_object[Right].Value or (return MakeError("Unknown Operator: {Right.GetType()}"))
+
+        return MakeSuccess(integer_object{Value := -Value})
+    }
+
+    EvaluateInfixExpression<private>(Operator:string, Left:object, Right:object):result(object, string) = {
+        if (LeftIntegerObject := integer_object[Left], RightIntegerObject := integer_object[Right]) {
+            return Self.EvaluateIntegerInfixExpression(Operator, LeftIntegerObject, RightIntegerObject)
+        } else if (LeftBooleanObject := boolean_object[Left], RightBooleanObject := boolean_object[Right]) {
+            return Self.EvaluateBooleanInfixExpression(Operator, LeftBooleanObject, RightBooleanObject)
+        } else if (LeftStringObject := string_object[Left], RightStringObject := string_object[Right]) {
+            return Self.EvaluateStringInfixExpression(Operator, LeftStringObject, RightStringObject)
+        } else if (Left.GetType() <> Right.GetType()){
+            return MakeError("Type Mismatch: {Left.GetType()} {Operator} {Right.GetType()}")
+        }
+
+        return MakeError("Unknown Infix Operator: {Left.GetType()} {Operator} {Right.GetType()}")
+    }
+
+    EvaluateIntegerInfixExpression<private>(Operator:string, Left:integer_object, Right:integer_object):result(object, string) = {
+        case (Operator) {
+            "+" => return MakeSuccess(integer_object{Value := Left.Value + Right.Value})
+            "-" => return MakeSuccess(integer_object{Value := Left.Value - Right.Value})
+            "*" => return MakeSuccess(integer_object{Value := Left.Value * Right.Value})
+            "/" => return MakeSuccess(integer_object{Value := Floor(Left.Value / Right.Value) or Err("Unreachable")}) # NOT FLOAT SAFE
+            "<" => return MakeSuccess(boolean_object{Value := logic{Left.Value < Right.Value}})
+            ">" => return MakeSuccess(boolean_object{Value := logic{Left.Value > Right.Value}})
+            "==" => return MakeSuccess(boolean_object{Value := logic{Left.Value = Right.Value}})
+            "!=" => return MakeSuccess(boolean_object{Value := logic{Left.Value <> Right.Value}})
+            _ => return MakeError("Unknown Integer Infix Operator: {Left.GetType()} {Operator} {Right.GetType()}")
+        }
+    }
+
+    EvaluateBooleanInfixExpression<private>(Operator:string, Left:boolean_object, Right:boolean_object):result(object, string) = {
+        case (Operator) {
+            "==" => return MakeSuccess(boolean_object{Value := logic{Left.Value = Right.Value}})
+            "!=" => return MakeSuccess(boolean_object{Value := logic{Left.Value <> Right.Value}})
+            _ => return MakeError("Unknown Boolean Infix Operator: {Left.GetType()} {Operator} {Right.GetType()}")
+        }
+    }
+
+    EvaluateIfExpression<private>(IfExpressionNode:if_expression_node):result(object, string) = {
+        _Condition := Self.Evaluate(IfExpressionNode.Condition)
+        Condition := _Condition.GetSuccess[] or (
+            Error := _Condition.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        IsTruthy := boolean_object[IfExpressionNode].Value or (
+            null_object[IfExpressionNode] and false
+        ) or true
+
+        if (IsTruthy?) {
+            _Evaluation := Self.Evaluate(IfExpressionNode.Consequence)
+            Evaluation := _Evaluation.GetSuccess[] or (
+                Error := _Evaluation.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+            return MakeSuccess(Evaluation)
+        } else if (Alternative := IfExpressionNode._Alternative?) {
+            _Evaluation := Self.Evaluate(Alternative)
+            Evaluation := _Evaluation.GetSuccess[] or (
+                Error := _Evaluation.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+            return MakeSuccess(Evaluation)
+        } else {
+            return MakeSuccess(null_object{})
+        }
+    }
+
+    EvaluateReturnStatement<private>(ReturnValueExpressionNode:expression_node):result(object, string) = {
+        _ReturnValue := Self.Evaluate(ReturnValueExpressionNode)
+        ReturnValue := _ReturnValue.GetSuccess[] or (
+            Error := _ReturnValue.GetError[] or Err("Unreachable")
+            return MakeError(Error)
+        )
+
+        return MakeSuccess(return_value_object{Value := ReturnValue})
+    }
+
+    EvaluateBlockStatement<private>(BlockStatementNode:block_statement_node):result(object, string) = {
+        var Result : object = null_object{}
+
+        for (Statement : BlockStatementNode.Statements) {
+            _EvaluationResult := Self.Evaluate(Statement)
+            EvaluationResult := _EvaluationResult.GetSuccess[] or (
+                Error := _EvaluationResult.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            if (ReturnValueEvaluationResult := return_value_object[EvaluationResult]). return MakeSuccess(ReturnValueEvaluationResult.Value)
+            else if (ErrorEvaluationResult := error_object[EvaluationResult]). return MakeSuccess(ErrorEvaluationResult)
+        }
+
+        MakeSuccess(Result)
+    }
+
+    EvaluateIdentifier<private>(IdentifierExpressionNode:identifier_expression_node):result(object, string) = {
+        if (Value := Self.Get[IdentifierExpressionNode.Value]). return MakeSuccess(Value)
+        else if (BuiltIn := BuiltInFunctions[IdentifierExpressionNode.Value]). return MakeSuccess(BuiltIn)
+        
+        return MakeError("Identifier Not Found: {IdentifierExpressionNode.Value}")
+    }
+
+    EvaluateExpressions<private>(Expressions:[]expression_node):result([]object, string) = {
+        var Result : []object = array{}
+
+        for (Expression : Expressions) {
+            _EvaluationResult := Self.Evaluate(Expression)
+            EvaluationResult := _EvaluationResult.GetSuccess[] or (
+                Error := _EvaluationResult.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            set Result += array{EvaluationResult}
+        }
+
+        MakeSuccess(Result)
+    }
+
+    ApplyFunction<private>(Function:object, Arguments:[]object):result(object, string) = {
+        if (FunctionObject := function_object[Function]) {
+            ExtendedEnvironment := Self.ExtendFunctionEnvironment(FunctionObject, Arguments)
+            _EvaluationResult := Self.Evaluate(FunctionObject.Body)
+            EvaluationResult := _EvaluationResult.GetSuccess[] or (
+                Error := _EvaluationResult.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+            return UnwrapReturnValue(EvaluationResult)
+        } else if (BuiltInFunction := builtin_function_object[Function]). return BuiltInFunction.Function(Arguments)
+
+        return MakeError("Not a Function: {Function.GetType()}")
+    }
+
+    ExtendFunctionEnvironment<private>(Function:function_object, Arguments:[]object):environment = {
+        Environment := NewEnclosedEnvironment()
+
+        for (Index->Parameter : Function.Parameters, Argument := Arguments[Index]) {
+            Environment.Set(Parameter.Value, Argument)
+        }
+
+        Environment
+    }
+
+    UnwrapReturnValue<private>(Object:object):result(object, string) = {
+        if (ReturnValueObject := return_value_object[Object]). return MakeSuccess(ReturnValueObject.Value)
+
+        return MakeSuccess(Object)
+    }
+
+    EvaluateStringInfixExpression<private>(Operator:string, Left:string_object, Right:string_object):result(object, string) = {
+        case (Operator) {
+            "+" => return MakeSuccess(string_object{Value := Left.Value + Right.Value})
+            _ => return MakeError("Unknown String Infix Operator: {Left.GetType()} {Operator} {Right.GetType()}")
+        }
+    }
+
+    EvaluateIndexExpression<private>(Left:object, Index:object):result(object, string) = {
+        if (ArrayObject := array_object[Left], IntegerIndex := integer_object[Index]) {
+            return Self.EvaluateArrayIndexExpression(ArrayObject, IntegerIndex)
+        } else if (HashObject := hash_object[Left], HashableIndex := hashable[HashObject]) {
+            return Self.EvaluateHashIndexExpression(HashObject, HashableIndex)
+        }
+
+        return MakeError("Index Operator Not Supported: {Left.GetType()}")
+    }
+
+    EvaluateArrayIndexExpression<private>(Array:array_object, Index:integer_object):result(object, string) = {
+        MakeSuccess(Array.Elements[Index.Value] or null_object{})
+    }
+
+    EvaluateHashLiteral<private>(HashLiteralExpressionNode:hash_literal_expression_node):result(object, string) = {
+        var Pairs : [string]object = map{}
+
+        for (KeyExpression->ValueExpression : HashLiteralExpressionNode.Pairs) {
+            _Key := Self.Evaluate(KeyExpression)
+            Key := _Key.GetSuccess[] or (
+                Error := _Key.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            Hashable := hashable[Key] or (
+                return MakeError("Unusable as Hash Key: {Key.GetType()}")
+            )
+
+            _Value := Self.Evaluate(ValueExpression)
+            Value := _Value.GetSuccess[] or (
+                Error := _Value.GetError[] or Err("Unreachable")
+                return MakeError(Error)
+            )
+
+            (set Pairs[Hashable.HashKey()] = Value) or Err("Unreachable")
+        }
+
+        return MakeSuccess(hash_object{Pairs := Pairs})
+    }
+
+    EvaluateHashIndexExpression<private>(Hash:hash_object, Index:hashable):result(object, string) = {
+        MakeSuccess(Hash.Pairs[Index.HashKey()] or null_object{})
+    }
+}

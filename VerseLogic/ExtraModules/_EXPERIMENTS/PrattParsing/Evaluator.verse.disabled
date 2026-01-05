@@ -1,0 +1,16 @@
+BuiltInFunctions<internal> : [string]builtin_function_object = map{
+    "Length" => builtin_function_object{
+        Function := builtin_length_function
+    }
+    "GetFortCharacter" => builtin_function_object{
+        Function := builtin_fort_character_function
+    }
+}
+
+builtin_length_function(Arguments:[]object):result(object, string) = {
+    MakeError("Function Not Yet Implemented")
+}
+
+builtin_fort_character_function(Arguments:[]object):result(object, string) = {
+    MakeError("Function Not Yet Implemented")
+}

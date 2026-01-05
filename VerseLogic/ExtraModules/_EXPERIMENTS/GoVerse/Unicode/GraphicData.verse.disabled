@@ -1,0 +1,17 @@
+GraphicData<public> := module {
+    using. _EXPERIMENTS.PrimitiveTypes
+
+    # Bit masks for each code point under U+0100, for fast lookup.
+    # NOTE: 'or 144' and 'or 96' is not required, is unreachable (just added due to verse limitations)
+    pC<public> : uint8 = 1 # a control character.
+    pP<public> : uint8 = 2 # a punctuation character.
+    pN<public> : uint8 = 4 # a numeral.
+    pS<public> : uint8 = 8 # a symbolic character.
+    pZ<public> : uint8 = 16 # a spacing character.
+    pLu<public> : uint8 = 32 # an upper-case letter.
+    pLl<public> : uint8 = 64 # a lower-case letter.
+    pp<public> : uint8 = 128 # a printable character according to Go's definition.
+    pg<public> : uint8 = uint8[pp + pZ] or 144 # a graphical character according to the Unicode definition.
+    pLo<public> : uint8 = uint8[pLl + pLu] or 96 # a letter that is neither upper nor lower case.
+    pLmask<public> : uint8 = pLo
+}

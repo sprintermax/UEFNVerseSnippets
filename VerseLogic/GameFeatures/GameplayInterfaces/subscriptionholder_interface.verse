@@ -16,3 +16,5 @@ subscriptionholder_interface<public> := interface {
         set TrackedSubscriptions = array{}
     }
 }
+
+subscriptionholder_container<public> := class(subscriptionholder_interface) {}

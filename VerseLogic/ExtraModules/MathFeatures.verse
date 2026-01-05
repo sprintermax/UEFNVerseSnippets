@@ -41,7 +41,14 @@ MathFeatures<public> := module {
         return ToLow + (Value - FromLow) * (ToHigh - ToLow) / (FromHigh - FromLow)
     }
 
-    (Value:int).ToFloat<public>()<computes>:float = Value * 1.0
+    Float<public>(Value:int)<computes>:float = Value * 1.0
+
+    Truncate<public>(Value:rational)<computes>:int = {
+        FloorResult := Floor(Value)
+        CeilResult := Ceil(Value)
+
+        FloorResult = CeilResult or Abs(FloorResult) < Abs(CeilResult) or CeilResult
+    }
 
     RoundDecimals<public>(Input:float, Decimals:int)<computes><decides><reads>:float = {
         Factor := Pow(10.0, Decimals * 1.0)
@@ -135,7 +142,7 @@ MathFeatures<public> := module {
         var<private> Iteration<public> : int = 0
         Multiplier<private> : int = 1664525
         Increment<private> : int = 1013904223
-        Modulo<private> : int = Constants.Max32BitInt
+        Modulo<private> : int = _MathConstants.Max32BitInt
 
         # Setup, Reset or Change the RNG state
         Init<public>(Seed:int)<transacts>:void = {
@@ -145,7 +152,7 @@ MathFeatures<public> := module {
 
         # Initializes the RNG with a random seed
         Init<public>()<transacts>:void = {
-            RandomSeed := GetRandomInt(Constants.Min32BitInt, Constants.Max32BitInt)
+            RandomSeed := GetRandomInt(_MathConstants.Min32BitInt, _MathConstants.Max32BitInt)
             Init(RandomSeed)
         }
 
@@ -232,9 +239,10 @@ MathFeatures<public> := module {
         it doesn't seem to support some ranges, completely breaking the result value by repeating the previous number or behaving
         completely weird with positive/negative signs and decimals. I avoid going over 32bit ints and floats values due to this.
     #>
-    Constants<public> := module {
+    _MathConstants<public> := module {
         Min32BitInt<public> : int = -2147483648 # Round[Pow(-2.0, 31.0)] or Err("Unreachable")
         Max32BitInt<public> : int = 2147483647 # Round[Pow(2.0, 31.0)] - 1 or Err("Unreachable")
+        Max32BitUInt<public> : int = 4294967295 # Round[Pow(2.0, 32.0)] - 1 or Err("Unreachable")
         Min64BitInt<public> : int = -9223372036854775808 # Round[Pow(-2.0, 63.0)] or Err("Unreachable")
         Max64BitInt<public> : int = 9223372036854775807 # Round[Pow(2.0, 63.0)] - 1 or Err("Unreachable")
         # Min64BitFloat<public>()<computes><reads>:float = Pow(2.0, -1022.0)
@@ -243,11 +251,11 @@ MathFeatures<public> := module {
     }
 
     # Get a random int between Min32BitInt and Max32BitInt
-    GetRandomInt<public>()<transacts>:int = GetRandomInt(Constants.Min32BitInt, Constants.Max32BitInt)
+    GetRandomInt<public>()<transacts>:int = GetRandomInt(_MathConstants.Min32BitInt, _MathConstants.Max32BitInt)
 
     # Get a random float between Min32BitInt and Max32BitInt
     # Verse has 64bit floats, but I avoid using that full range due to some issues explained above
-    GetRandomFloat<public>()<transacts>:float = GetRandomFloat(Constants.Min32BitInt * 1.0, Constants.Max32BitInt * 1.0)
+    GetRandomFloat<public>()<transacts>:float = GetRandomFloat(_MathConstants.Min32BitInt * 1.0, _MathConstants.Max32BitInt * 1.0)
 
 
 

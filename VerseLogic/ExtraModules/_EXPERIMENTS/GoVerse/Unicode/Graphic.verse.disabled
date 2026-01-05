@@ -1,0 +1,15 @@
+using. GraphicData
+using. TablesData
+
+# GraphicRanges defines the set of graphic characters according to Unicode.
+GraphicRanges<public> : []range_table = array{
+    L, M, N, P, S, Zs
+}
+
+# PrintRanges defines the set of printable characters according to Go.
+# ASCII space, U+0020, is handled separately.
+PrintRanges<public> : []range_table = array{
+    L, M, N, P, S
+}
+
+# WIP Functions

@@ -1,0 +1,61 @@
+token<internal> := struct<internal><computes> {
+    Type<public> : string
+    Literal<public> : string
+}
+
+BuiltInTokens<internal> : [string]string = map{
+    "ILLEGAL"               => "ILLEGAL"    # Illegal Token At Pos
+    "EOF"                   => "EOF"        # End Of File
+
+    "IDENT"                 => "IDENT"      # Keyword Identifier
+    "INTEGER"               => "INTEGER"    # Integer Literal
+    # "FLOAT"                 => "FLOAT"      # Float Literal
+    "STRING"                => "STRING"     # String Literal
+
+    "ASSIGN"                => "="          # Assignment Operator
+    "PLUS"                  => "+"          # Addition Operator
+    "MINUS"                 => "-"          # Subtraction Operator
+    "NEGATE"                  => "!"          # Negation Operator
+    "ASTERISK"              => "*"          # Multiplication Operator
+    "SLASH"                 => "/"          # Division Operator
+
+    "EQUAL"                 => "=="         # Equality Operator
+    "NOT_EQUAL"             => "!="         # Inequality Operator
+    "LESS_THAN"             => "<"          # Less Than Operator
+    # "LESS_THAN_EQUAL"       => "<="         # Less Than Equal Operator
+    "GREATER_THAN"          => ">"          # Greater Than Operator
+    # "GREATER_THAN_EQUAL"    => ">="         # Greater Than Equal Operator
+
+    "COMMA"                 => ","          # Comma Delimiter
+    "SEMICOLON"             => ";"          # Semicolon Delimiter
+    "COLON"                 => ":"          # Colon Delimiter
+
+    "LEFT_PARENTHESIS"      => "("          # Left Parenthesis
+    "RIGHT_PARENTHESIS"     => ")"          # Right Parenthesis
+    "LEFT_BRACE"            => "\{"         # Left Brace
+    "RIGHT_BRACE"           => "\}"         # Right Brace
+    "LEFT_BRACKET"          => "["          # Left Bracket
+    "RIGHT_BRACKET"         => "]"          # Right Bracket
+
+    "FUNCTION"              => "FUNCTION"   # Function Keyword
+    "LET"                   => "LET"        # Let Keyword
+    "TRUE"                  => "TRUE"       # True Keyword
+    "FALSE"                 => "FALSE"      # False Keyword
+    "IF"                    => "IF"         # If Keyword
+    "ELSE"                  => "ELSE"       # Else Keyword
+    "RETURN"                => "RETURN"     # Return Keyword
+}
+
+BuiltInKeywords<internal> : [string]string = map{
+    "fn"        => BuiltInTokens["FUNCTION"] or "ILLEGAL"
+    "let"       => BuiltInTokens["LET"] or "ILLEGAL"
+    "true"      => BuiltInTokens["TRUE"] or "ILLEGAL"
+    "false"     => BuiltInTokens["FALSE"] or "ILLEGAL"
+    "if"        => BuiltInTokens["IF"] or "ILLEGAL"
+    "else"      => BuiltInTokens["ELSE"] or "ILLEGAL"
+    "return"    => BuiltInTokens["RETURN"] or "ILLEGAL"
+}
+
+LookupIdentifier<internal>(Keyword:string)<computes>:string = {
+    BuiltInKeywords[Keyword] or "IDENT"
+}

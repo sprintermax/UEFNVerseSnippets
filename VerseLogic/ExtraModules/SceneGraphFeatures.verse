@@ -3,35 +3,30 @@ using. /Verse.org/SceneGraph
 using. /Verse.org/Simulation
 using. /Verse.org/SpatialMath
 
-OldSpatialMath := import(/UnrealEngine.com/Temporary/SpatialMath)
+# OldSpatialMath<public> := import(/UnrealEngine.com/Temporary/SpatialMath)
 
 <#> NOTE: Scene Graph is under constant development by epic, with lots of features changing over time.
     Expect this file to have lots of breaking changes until reaching a more stable state.
 
 SceneGraphFeatures<public> := module {
 
-    <#> Player Entity is not officially released, but can already be queried using this method for some specific use cases.
-        Not recommended to use on production projects, since usage, functionality and behavior may have breaking changes.
-    (Entity:entity).GetAgentEntity<public>(Agent:agent)<decides><transacts>:entity = {
+    # If Strict is set to true, will force a fail when no agent was found
+    (Entity:entity).GetAgentsInVolume<public>(GlobalTransform:transform, Volume:collision_volume, (?Strict:logic=false))<decides><transacts>:[]agent = {
 
-        AgentFortChar := Agent.GetFortCharacter[]; AgentFortChar.IsActive[]
-        AgentTransform := OldSpatialMath.FromTransform(AgentFortChar.GetTransform())
+        var AgentsInVolume : []agent = array{}
 
-        var _AgentEntity : ?entity = false
         for (
-            OverlapHit : Entity.FindOverlapHits(AgentTransform, collision_point{
-                CollisionProfile := CollisionProfiles.DynamicOverlapAll
-            })
-            not _AgentEntity?
+            OverlapHit : Entity.FindOverlapHits(GlobalTransform, Volume)
             TargetEntity := OverlapHit.TargetComponent.Entity
-            TargetEntityComponent : TargetEntity.GetComponents()
-            EntityFortChar := fort_character[TargetEntityComponent]
-            EntityFortChar.GetAgent[] = Agent
+            EntityAgent := agent[TargetEntity]
+            not AgentsInVolume.Find[EntityAgent]
         ) {
-            set _AgentEntity = option{TargetEntity}
+            set AgentsInVolume += array{EntityAgent}
         }
 
-        _AgentEntity?
+        AgentsInVolume.Length > 0 or not Strict?
+
+        AgentsInVolume
     }
 
 
@@ -133,16 +128,50 @@ SceneGraphFeatures<public> := module {
         }
 
         # Conditional filtering functions to be used on Line Trace Result Array (See VerseFeatures -> Array Operations -> Find/Filter Functions)
-        is_target_component<public>(TraceTargetInfo:line_trace_target_info, component_type:castable_subtype(component))<computes><decides>:void = {
+        (LineTraceRaycast:)filter_by_entity_type<public>(TraceTargetInfo:line_trace_target_info, entity_type:castable_subtype(entity))<computes><decides>:void = {
+            entity_type[TraceTargetInfo.Component?.Entity]
+        }
+
+        (LineTraceRaycast:)filter_by_component_type<public>(TraceTargetInfo:line_trace_target_info, component_type:castable_subtype(component))<computes><decides>:void = {
             component_type[TraceTargetInfo.Component?]
         }
 
-        is_target_entity_with_component<public>(TraceTargetInfo:line_trace_target_info, component_type:castable_subtype(component))<computes><decides><reads>:void = {
+        (LineTraceRaycast:)filter_by_entity_implements_component<public>(TraceTargetInfo:line_trace_target_info, component_type:castable_subtype(component))<computes><decides><reads>:void = {
             TraceTargetInfo.Component?.Entity.GetComponent[component_type]
         }
 
-        is_target_type<public>(TraceTargetInfo:line_trace_target_info, TargetType:line_trace_target_type)<computes><decides>:void = {
+        (LineTraceRaycast:)filter_by_traceinfo_type<public>(TraceTargetInfo:line_trace_target_info, TargetType:line_trace_target_type)<computes><decides>:void = {
             TraceTargetInfo.Type = TargetType
         }
     }
+
+    # Conditional filtering functions to be used on
+    filter_by_entity_type<public>(InEntity:entity, entity_type:castable_subtype(entity))<computes><decides>:void = {
+        entity_type[InEntity]
+    }
+
+    # filter_by_entity_implements_interface<public>(InEntity:entity, interface_type:castable_subtype(interface))<computes><decides>:void = {
+    #     interface_type[InEntity]
+    # }
+
+    filter_by_component_type<public>(InComponent:component, component_type:castable_subtype(component))<computes><decides>:void = {
+        component_type[InComponent]
+    }
+
+    # filter_by_component_implements_interface<public>(InComponent:component, interface_type:castable_subtype(interface))<computes><decides>:void = {
+    #     interface_type[InComponent]
+    # }
+
+    filter_by_entity_implements_component<public>(InEntity:entity, component_type:castable_subtype(component))<computes><decides><reads>:void = {
+        InEntity.GetComponent[component_type]
+    }
+
+    # filter_by_entity_implements_component_with_interface<public>(InEntity:entity, interface_type:castable_subtype(interface))<computes><decides><reads>:void = {
+    #     (for (
+    #         Component : InEntity.GetComponents()
+    #         interface_type[InComponent]
+    #     ) {
+    #         Component
+    #     }).Length > 0
+    # }
 }

@@ -1,0 +1,35 @@
+LetterData<public> := module {
+    using. _EXPERIMENTS.PrimitiveTypes
+
+    MaxRune<public> : rune = 0x0010FFFF # Maximum valid Unicode code point.
+    ReplacementChar<public> : rune = 0xFFFD # Represents invalid code points.
+    MaxASCII<public> : rune = 0x007F # maximum ASCII value.
+    MaxLatin1<public> : rune = 0x00FF # maximum Latin-1 value.
+
+    <#>
+        SpecialCase represents language-specific case mappings such as Turkish.
+        Methods of SpecialCase customize (by overriding) the standard mappings.
+    special_case<public> := []case_range
+
+    # BUG(r): There is no mechanism for full case folding, that is, for
+    # characters that involve multiple runes in the input or output.
+
+    # Indices into the Delta arrays inside CaseRanges for case mapping.
+    UpperCase<public> : uint8 = 0
+    LowerCase<public> : uint8 = 1
+    TitleCase<public> : uint8 = 2
+    MaxCase<public> : uint8 = 3
+
+    <#>
+        If the Delta field of a [CaseRange] is UpperLower, it means
+        this CaseRange represents a sequence of the form (say)
+        [Upper] [Lower] [Upper] [Lower].
+        
+        NOTE: 'or 1114112' is not required, is unreachable (just added due to verse limitations)
+    UpperLower<public> : rune = rune[MaxRune + 1] or 1114112 # (Cannot be a valid delta.)
+
+    <#>
+        linearMax is the maximum size table for linear search for non-Latin1 rune.
+        Derived by running 'go test -calibrate'.
+    linearMax<public> : uint8 = 18
+}

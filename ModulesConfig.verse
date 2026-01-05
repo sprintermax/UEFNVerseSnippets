@@ -1,11 +1,29 @@
 # Verse Modules Folders
 VerseLogic<public> := module{
-    ExtraModules<public> := module{}
+    Algorithms<public> := module{}
+    ExtraModules<public> := module{
+        BitMath<public> := module{}
+        Crypto<public> := module{}
+        DateTime<public> := module{}
+        Encoding<public> := module{
+            UUID<public> := module{}
+        }
+        Hashing<public> := module{
+            MD5<public> := module{}
+        }
+        StringProcessing<public> := module{
+            Regex<public> := module{
+                Syntax<public> := module{}
+            }
+        }
+    }
     GameFeatures<public> := module{
         DataDefinitions<public> := module{}
         DataManagement<public> := module{}
         GameplayClasses<public> := module{
-            CoreComponents<public> := module{}
+            CoreComponents<public> := module{
+                DebugDraw<public> := module{}
+            }
             CreativeDevices<public> := module{}
             UILibrary<public> := module{
                 Screens<public> := module{}
@@ -29,11 +47,21 @@ VerseLogic<public> := module{
 CommonAssets<public> := module{
     Materials<public> := module{
         Instances<public> := module{}
-        Functions<public> := module{}
+        Functions<public> := module{
+            MathLogic<public> := module{
+                FloatBool<public> := module{}
+            }
+            Utils<public> := module{}
+        }
     }
     Meshes<public> := module{}
+    Metasound<public> := module{}
     Textures<public> := module{
         Icons<public> := module{}
+        WorldGrid<public> := module{}
+    }
+    Particles<public> := module{
+        DebugDraw<public> := module{}
     }
 }
 
@@ -69,7 +97,7 @@ UserInterface<public> := module{
             Statistics<public> := module{}
         }
     }
-    Widgets<public> := module{
+    WidgetBlueprints<public> := module{
         Templates<public> := module{}
     }
 }

@@ -1,0 +1,5 @@
+https://dev.epicgames.com/documentation/en-us/fortnite/string-in-verse
+https://en.wikipedia.org/wiki/UTF-8
+https://www.unicode.org/Public/UCD/latest/ucd/NamesList.txt
+https://www.utf8-chartable.de/unicode-utf8-table.pl?names=2
+https://www.fileformat.info/info/charset/UTF-8/list.htm

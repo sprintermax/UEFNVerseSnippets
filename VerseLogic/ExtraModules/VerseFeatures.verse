@@ -18,6 +18,17 @@ VerseFeatures<public> := module {
     Success<public>()<computes><decides>:void = void
     Failure<public>()<computes><decides>:false = false? and Err("Unreachable")
 
+    # Unsafe function call, it expect to always succeed, or else will throw a runtime error.
+    #
+    # It was made for usage on places where the result is already known to always succeed, such
+    # as defining constants and avoiding patterns like `Something[] or Err("Unreachable")`
+    Must<public>(Function:type{_(:t)<decides><transacts>:t2}, Args:t where t:type, t2:type)<transacts>:t2 = {
+        Function[Args] or Err("Unreachable")
+    }
+    Must<public>(Result:result(t, any) where t:type)<computes>:t = {
+        Result.GetSuccess[] or Err("This is your fault.")
+    }
+
     (VerseFeatures:)ToString<public>(Input:logic)<computes>:string = {
         if (Input?) { "true" } else { "false" }
     }
@@ -71,6 +82,23 @@ VerseFeatures<public> := module {
     # Returns an array with all values of the map
     (Input:[k]v where k:subtype(comparable), v:type).Values<public>()<computes>:[]v = {
         for (CurrentValue : Input). CurrentValue
+    }
+
+    # Merges an array of maps into a single map.
+    # In case of key conflicts, later maps override earlier ones.
+    ReduceMaps<public>(InputMaps:[][k]v where k:subtype(comparable), v:type)<computes>:[k]v = {
+        InputMapsLength := InputMaps.Length
+
+        FirstMap := InputMaps[0] or (return map{})
+        SecondMap := InputMaps[1] or (return FirstMap)
+
+        MergedMap := ConcatenateMaps(FirstMap, SecondMap)
+
+        OtherMaps := InputMaps.Slice[2] or Err("Unreachable")
+
+        if (OtherMaps.Length = 0). return MergedMap
+
+        return ReduceMaps(array{MergedMap} + OtherMaps)
     }
 
     # Returns a map without the map element that Key matches the Key provided
@@ -197,6 +225,20 @@ VerseFeatures<public> := module {
 
     (Input:[]t where t:type).At<public>(Index:int)<computes><decides>:t = {
         Input[NormalizeIndex[Input.Length, Index]]
+    }
+
+    (Input:[]t where t:subtype(comparable)).FindLast<public>(ElementToFind:t)<decides><transacts>:int = {
+        LastIndex := Input.Length - 1
+
+        var MaybeIndex:?int = false
+        for (
+            Index := 0..LastIndex
+            not MaybeIndex?
+            InverseIndex := LastIndex - Index
+            Input[InverseIndex] = ElementToFind
+        ). set MaybeIndex = option{InverseIndex}
+
+        MaybeIndex?
     }
 
     (Input:generator(t) where t:type).AsArray<public>()<computes>:[]t = {
@@ -364,72 +406,5 @@ VerseFeatures<public> := module {
 
         Unshift<public>(Element:t)<computes>:Container(t) = AddFirst(Element)
         Shift<public>()<computes><decides>:tuple(Container(t), t) = GetFirst[]
-    }
-
-    ### String Utils
-
-    CharToIntMap<public>:[char]int = map{
-        '0' => 0, '1' => 1, '2' => 2, '3' => 3, '4' => 4,
-        '5' => 5, '6' => 6, '7' => 7, '8' => 8, '9' => 9
-    }
-
-    # Tries to convert a numeric string to integer
-    # Fails if the string is empty or not a valid integer number
-    StringToInt<public>(String:string)<decides><transacts>:int = {
-        String.Length > 0
-        
-        var IntegerNumber:int = 0
-
-        IsNegative := if (String[0] = '-') { true } else { false }
-
-        for (Index->Char : String) {
-            if (Index > 0 or not IsNegative?) {
-                CurrentDigit := CharToIntMap[Char]
-                set IntegerNumber = IntegerNumber * 10 + CurrentDigit
-            }
-        }
-
-        if (IsNegative?). IntegerNumber * -1 else. IntegerNumber
-    }
-
-    # Tries to convert a numeric string to float (Including Inf and NaN values)
-    # Fails if the string is empty or not a valid float number
-    # If Strict is set to true, will force a fail if the resulting value is Inf or NaN
-    StringToFloat<public>(String:string, ?Strict:logic=false)<decides><transacts>:float = {
-        String.Length > 0
-
-        var FloatNumber:float = 0.0
-        var IsFractionPart:logic = false
-        var FractionDivider:float = 1.0
-
-        IsNegative := if (String[0] = '-') { true } else { false }
-
-        if (String = "-Inf" or String = "Inf") {
-            not Strict?
-            set FloatNumber = Inf
-        } else if (String = "NaN") {
-            not Strict?
-            set FloatNumber = NaN
-        } else {
-            for (Index->Char : String) {
-                if (Index > 0 or not IsNegative?) {
-                    if (Char = '.') {
-                        set IsFractionPart = true
-                    } else {
-
-                        CurrentDigit := CharToIntMap[Char]
-
-                        if (IsFractionPart?) {
-                            set FractionDivider *= 10.0
-                            set FloatNumber += CurrentDigit * 1.0 / FractionDivider
-                        } else {
-                            set FloatNumber = FloatNumber * 10.0 + CurrentDigit * 1.0
-                        }
-                    }
-                }
-            }
-        }
-
-        if (IsNegative?). FloatNumber * -1.0 else. FloatNumber
     }
 }

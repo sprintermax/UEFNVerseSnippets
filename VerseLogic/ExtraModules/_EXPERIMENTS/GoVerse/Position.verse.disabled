@@ -1,0 +1,369 @@
+using. MathFeatures
+
+using. Slices
+
+# -----------------------------------------------------------------------------
+# Positions
+
+# Position describes an arbitrary source position
+# including the file, line, and column location.
+# A Position is valid if the line number is > 0.
+position<public> := class<internal><computes> {
+    FileName<public> : string = ""# filename, if any
+    Offset<public> : int = 0 # offset, starting at 0
+    Line<public> : int = 0 # line number, starting at 1
+    Column<public> : int = 0 # column number, starting at 1 (byte count)
+
+    # IsValid reports whether the position is valid.
+    IsValid<private>()<computes><decides>:void = {
+        Self.Line > 0
+    }
+
+    # String returns a string in one of several forms:
+    #
+    #	file:line:column    valid position with file name
+    #	file:line           valid position with file name but no column (column == 0)
+    #	line:column         valid position without file name
+    #	line                valid position without file name and no column (column == 0)
+    #	file                invalid position with file name
+    #	-                   invalid position without file name
+    String<private>():string = {
+        var _String : string = Self.FileName
+
+        option{
+            Self.IsValid[]
+            _String = "" or (set _String += ":")
+            set _String += "{Self.Line}"
+            Self.Column = 0 or (set _String += ":{Self.Column}")
+        }
+        
+        _String <> "" or (set _String = "-")
+
+        _String
+    }
+}
+
+# Pos is a compact encoding of a source position within a file set.
+# It can be converted into a [Position] for a more convenient, but much
+# larger, representation.
+#
+# The Pos value for a given file is a number in the range [base, base+size],
+# where base and size are specified when a file is added to the file set.
+# The difference between a Pos value and the corresponding file base
+# corresponds to the byte offset of that position (represented by the Pos value)
+# from the beginning of the file. Thus, the file base offset is the Pos value
+# representing the first byte in the file.
+#
+# To create the Pos value for a specific source offset (measured in bytes),
+# first add the respective file to the current file set using [FileSet.AddFile]
+# and then call [File.Pos](offset) for that file. Given a Pos value p
+# for a specific file set fset, the corresponding [Position] value is
+# obtained by calling fset.Position(p).
+#
+# Pos values can be compared directly with the usual comparison operators:
+# If two Pos values p and q are in the same file, comparing p and q is
+# equivalent to comparing the respective source file offsets. If p and q
+# are in different files, p < q is true if the file implied by p was added
+# to the respective file set before the file implied by q.
+pos<public> := int
+
+# The zero value for [Pos] is NoPos; there is no file and line information
+# associated with it, and NoPos.IsValid() is false. NoPos is always
+# smaller than any other [Pos] value. The corresponding [Position] value
+# for NoPos is the zero value for [Position].
+NoPos<public> : pos = 0
+
+# IsValid reports whether the position is valid.
+(Position:pos).IsValid<public>()<computes><decides>:void = {
+    Position <> NoPos
+}
+
+# -----------------------------------------------------------------------------
+# File
+
+# A File is a handle for a file belonging to a [FileSet].
+# A File has a name, size, and line offset table.
+#
+# Use [FileSet.AddFile] to create a File.
+# A File may belong to more than one FileSet; see [FileSet.AddExistingFiles].
+(Token:)file<public> := class<internal><computes><allocates> {
+    Name<internal> : string   # file name as provided to AddFile
+    Base<internal> : int      # Pos value range for this file is [base...base+size]
+    Size<internal> : int      # file size as provided to AddFile
+
+    var<internal> Lines<internal> : []int # lines contains the offset of the first character for each line (the first entry is always 0)
+    var<internal> Infos<internal> : []line_info
+
+    # AddLine adds the line offset for a new line.
+    # The line offset must be larger than the offset for the previous line
+    # and smaller than the file size; otherwise the line offset is ignored.
+    AddLine<public>(_Offset:int)<transacts>:void = {
+        option{
+            Index := Self.Lines.Length
+
+            Index = 0 or Self.Lines[Index - 1] < _Offset
+            _Offset < Self.Size
+
+            set Self.Lines += array{_Offset}
+        }
+    }
+
+    # MergeLine merges a line with the following line. It is akin to replacing
+    # the newline character at the end of the line with a space (to not change the
+    # remaining offsets). To obtain the line number, consult e.g. [Position.Line].
+    # MergeLine will panic if given an invalid line number.
+    MergeLine<private>(_Line:int):result(void, string) = {
+        _Line >= 1 or (return MakeError("Invalid line number{_Line} (should be >= 1)"))
+        _Line < Self.Lines.Length or (return MakeError("Invalid line number {_Line} (should be < {Self.Lines.Length})"))
+
+        # To merge the line numbered <line> with the line numbered <line+1>,
+        # we need to remove the entry in lines corresponding to the line
+        # numbered <line+1>. The entry in lines corresponding to the line
+        # numbered <line+1> is located at index <line>, since indices in lines
+        # are 0-based and line numbers are 1-based.
+        MergedLine := Self.Lines[_Line - 1] + Self.Lines[_Line] or Err("Unreachable")
+        set Self.Lines = Self.Lines.RemoveElement[_Line] or Err("Unreachable")
+        (set Self.Lines[_Line - 1] = MergedLine) or Err("Unreachable")
+
+        MakeSuccess()
+    }
+
+    # SetLines sets the line offsets for a file and reports whether it succeeded.
+    # The line offsets are the offsets of the first character of each line;
+    # for instance for the content "ab\nc\n" the line offsets are {0, 3}.
+    # An empty file has an empty line offset table.
+    # Each line offset must be larger than the offset for the previous line
+    # and smaller than the file size; otherwise SetLines fails and returns
+    # false.
+    # Callers must not mutate the provided slice after SetLines returns.
+    SetLines<private>(_Lines:[]int)<transacts><decides>:void = {
+        # verify validity of lines table
+        for (Index->_Offset : _Lines) {
+            not (Index > 0 and _Offset <= _Lines[Index - 1] or Self.Size <= _Offset)
+        }
+
+        # set lines table
+        set Self.Lines = _Lines
+    }
+
+    # SetLinesForContent sets the line offsets for the given file content.
+    # It ignores position-altering //line comments.
+    SetLinesForContent<private>(Content:[]char):void = {
+        var _Lines : []int = array{}
+        var _Line : int = 0
+
+        for (_Offset->Char : Content) {
+            option{
+                _Line >= 0
+                set _Lines += array{_Line}
+            }
+
+            set _Line = -1
+            
+            option{
+                Char = '\n'
+                set _Line = _Offset + 1
+            }
+        }
+
+        # set lines table
+        set Self.Lines = _Lines
+    }
+
+    # LineStart returns the [Pos] value of the start of the specified line.
+    # It ignores any alternative positions set using [File.AddLineColumnInfo].
+    # LineStart panics if the 1-based line number is invalid.
+    SetLinesForContent<private>(_Line:int):result(pos, string) = {
+        _Line >= 1 or (return MakeError("Invalid line number{_Line} (should be >= 1)"))
+        _Line < Self.Lines.Length or (return MakeError("Invalid line number {_Line} (should be < {Self.Lines.Length})"))
+
+        MakeSuccess(pos(Self.Base + Self.Lines[_Line - 1]) or Err("Unreachable"))
+    }
+
+    # AddLineColumnInfo adds alternative file, line, and column number
+    # information for a given file offset. The offset must be larger
+    # than the offset for the previously added alternative line info
+    # and smaller than the file size; otherwise the information is
+    # ignored.
+    #
+    # AddLineColumnInfo is typically used to register alternative position
+    # information for line directives such as //line filename:line:column.
+    AddLineColumnInfo<public>(_Offset:int, FileName:string, _Line:int, Column:int)<transacts>:void = {
+        option{
+            Index := Self.Infos.Length
+
+            Index = 0 or Self.Infos[Index - 1].Offset < _Offset
+            _Offset < Self.Size
+
+            set Self.Infos += array{line_info{
+                Offset := _Offset
+                FileName := FileName
+                Line := _Line
+                Column := Column
+            }}
+        }
+    }
+
+    # FixOffset fixes an out-of-bounds offset such that 0 <= offset <= f.size.
+    FixOffset<private>(_Offset:int)<computes>:int = {
+        _Offset >= 0 or (return 0)
+        _Offset <= Self.Size or (return Self.Size)
+        _Offset
+    }
+
+    # Pos returns the Pos value for the given file offset.
+    #
+    # If offset is negative, the result is the file's start
+    # position; if the offset is too large, the result is
+    # the file's end position (see also go.dev/issue/57490).
+    #
+    # The following invariant, though not true for Pos values
+    # in general, holds for the result Pos:
+    # File.Pos(File.Offset(Pos)) == Pos.
+    Pos<public>(_Offset:int)<computes>:pos = {
+        Self.Base + Self.FixOffset(_Offset)
+    }
+
+    # Offset returns the offset for the given file position p.
+    #
+    # If p is before the file's start position (or if p is NoPos),
+    # the result is 0; if p is past the file's end position,
+    # the result is the file size (see also go.dev/issue/57490).
+    #
+    # The following invariant, though not true for offset values
+    # in general, holds for the result offset:
+    # File.Offset(File.Pos(offset)) == offset
+    Offset<private>(_Pos:pos):int = {
+        Self.FixOffset(_Pos - Self.Base)
+    }
+
+    # Line returns the line number for the given file position p;
+    # p must be a [Pos] value in that file or [NoPos].
+    Line<private>(_Pos:pos):int = {
+        Self.Position(_Pos).Line
+    }
+
+    # unpack returns the filename and line and column number for a file offset.
+    # If adjusted is set, unpack will return the filename and line information
+    # possibly adjusted by //line comments; otherwise those comments are ignored.
+    Unpack<private>(_Offset:int, Adjusted:logic)<transacts>:tuple(string, int, int) = {
+        var FileName : string = Self.Name
+
+        var _Line : int = 0
+        var Column : int = 0
+
+        option{
+            I := SearchInts(Self.Lines, _Offset)
+            I >= 0
+
+            set _Line = I + 1
+            _Column := _Offset - Self.Lines[I] + 1
+            set Column = _Column
+        }
+
+        option{
+            Adjusted? and Self.Infos.Length > 0
+
+            # few files have extra line infos
+            I := SearchLineInfos(Self.Infos, _Offset)
+            I >= 0
+
+            Alt := Self.Infos[I]
+            set FileName = Alt.FileName
+
+            option{
+                I2 := SearchInts(Self.Lines, Alt.Offset)
+                I >= 0
+
+                # i+1 is the line at which the alternative position was recorded
+                D := _Line - (I2 + 1)
+                set _Line = Alt.Line + D
+
+                option{
+                    Alt.Column = 0
+                    # alternative column is unknown => relative column is unknown
+					# (the current specification for line directives requires
+					# this to apply until the next PosBase/line directive,
+					# not just until the new newline)
+                    set Column = 0
+                }? or option{
+                    D = 0
+                    # the alternative position base is on the current line
+					# => column is relative to alternative column
+                    set Column = Alt.Column + (_Offset - Alt.Offset)
+                }
+            }
+        }
+
+        (FileName, _Line, Column)
+    }
+
+    Position<public>(_Position:int<#Token.pos#>, Adjusted:logic)<transacts>:position = {
+        _Offset := Self.FixOffset(_Position - Self.Base)
+        UnpackedData := Self.Unpack(_Offset, Adjusted)
+        position{
+            FileName := (UnpackedData(0))
+            Offset := _Offset
+            Line := UnpackedData(1)
+            Column := UnpackedData(2)
+        }
+    }
+
+    # PositionFor returns the Position value for the given file position p.
+    # If p is out of bounds, it is adjusted to match the File.Offset behavior.
+    # If adjusted is set, the position may be adjusted by position-altering
+    # //line comments; otherwise those comments are ignored.
+    # p must be a Pos value in f or NoPos.
+    PositionFor<private>(_Position:int<#Token.pos#>, Adjusted:logic)<transacts>:position = {
+        Self.Position(_Position <> Token.NoPos, Adjusted) or position{}
+    }
+
+    # Position returns the Position value for the given file position p.
+    # If p is out of bounds, it is adjusted to match the File.Offset behavior.
+    # Calling f.Position(p) is equivalent to calling f.PositionFor(p, true).
+    Position<public>(_Position:int<#Token.pos#>)<transacts>:position = {
+        Self.PositionFor(_Position, true)
+    }
+}
+
+# A lineInfo object describes alternative file, line, and column
+# number information (such as provided via a //line directive)
+# for a given file offset.
+line_info<public> := struct<internal> {
+    Offset<public> : int
+    FileName<public> : string
+    Line<public> : int
+    Column<public> : int
+}
+
+SearchLineInfos<internal>(A:[]line_info, X:int)<transacts>:int = {
+    SearchResult := A.BinarySearchDynamic(Cmp.LessLineInfo, X)
+    SearchResult(1)? and SearchResult(0) or SearchResult(0) - 1
+}
+
+# -----------------------------------------------------------------------------
+# Helper functions
+
+SearchInts<internal>(A:[]int, X:int)<transacts>:int = {
+    # This function body is a manually inlined version of:
+	#
+	# return sort.Search(len(a), func(i int) bool { return a[i] > x }) - 1
+	#
+	# With better compiler optimizations, this may not be needed in the
+	# future, but at the moment this change improves the go/printer
+	# benchmark performance by ~30%. This has a direct impact on the
+	# speed of gofmt and thus seems worthwhile (2011-04-29).
+    var I : int = 0
+    var J : int = A.Length
+
+    loop {
+        I < J or (break)
+
+        H := ((I + J) / 2).Truncate() or Err("Unreachable")
+
+        # i <= h < j
+        A[H] <= X and (set I = H + 1) or (set J = H)
+    }
+
+    I - 1
+}
