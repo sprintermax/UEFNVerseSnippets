@@ -23,7 +23,7 @@ VerseFeatures<public> := module {
     # It was made for usage on places where the result is already known to always succeed, such
     # as defining constants and avoiding patterns like `Something[] or Err("Unreachable")`
     Must<public>(Function:type{_(:t)<decides><transacts>:t2}, Args:t where t:type, t2:type)<transacts>:t2 = {
-        Function[Args] or Err("Unreachable")
+        Function[Args] or Err("This is your fault.")
     }
     Must<public>(Result:result(t, any) where t:type)<computes>:t = {
         Result.GetSuccess[] or Err("This is your fault.")

@@ -23,7 +23,7 @@ Crock32<public> := module {
             }
         }
 
-        return _Result?
+        _Result?
     }
 
     Decode<public>(String:string)<decides><transacts>:int = {
@@ -34,7 +34,7 @@ Crock32<public> := module {
             set _Result = option{_Result? * 32 + CharIndex}
         }
 
-        return _Result?
+        _Result?
     }
 
     

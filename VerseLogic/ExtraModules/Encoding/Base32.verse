@@ -15,13 +15,11 @@ Base32<public> := module {
         Encoder:string,
         ?PadCharacter:?char = option{StdPadding}
     )<computes><decides> := encoding{
-        let {
-            _Guard := block {
-                Encoder.Length = 32
-                if (_PadCharacter := PadCharacter?) {
-                    not array{'\r', '\n'}.Find[_PadCharacter]
-                    not Encoder.Find[_PadCharacter]
-                }
+        block {
+            Encoder.Length = 32
+            if (_PadCharacter := PadCharacter?) {
+                not array{'\r', '\n'}.Find[_PadCharacter]
+                not Encoder.Find[_PadCharacter]
             }
         }
 
@@ -84,7 +82,7 @@ Base32<public> := module {
                 }
             }
 
-            return Result
+            Result
         }
 
         Decode<public>(Source:string)<decides><transacts>:string = {
@@ -151,7 +149,7 @@ Base32<public> := module {
                 }
             }
 
-            return Result
+            Result
         }
     }
 

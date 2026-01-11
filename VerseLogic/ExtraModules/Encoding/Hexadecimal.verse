@@ -1,4 +1,5 @@
 Hexadecimal<public> := module{
+    using. BitMath
     using. MathFeatures
     using. StringProcessing
 
@@ -20,14 +21,14 @@ Hexadecimal<public> := module{
         HighNibble := HexAlphabet[Quotient[Byte, 16]]
         LowNibble := HexAlphabet[Mod[Byte, 16]]
 
-        return "{HighNibble}{LowNibble}"
+        "{HighNibble}{LowNibble}"
     }
 
     # Converts a single char to its two-character hexadecimal representation
     EncodeCharToHex<public>(Character:char)<computes>:string = {
         ByteValue := CharToInt(Character)
         
-        return EncodeByteToHex[ByteValue] or Err("Unreachable")
+        EncodeByteToHex[ByteValue] or Err("Unreachable")
     }
 
     # Converts a string to its hexadecimal string representation
@@ -38,23 +39,30 @@ Hexadecimal<public> := module{
         Concatenate(HexBytes)
     }
 
-    # Converts an integer to its hexadecimal string representation
+    # Converts an arbitrary-sized integer to its hexadecimal string representation
     # Fails if the input integer is negative
-    EncodeIntToHex<public>(Value:int)<decides><transacts>:string = {
+    EncodeIntToHex<public>(Value:int)<computes><decides><reads>:string = {
         Value >= 0
 
-        var ResultHex : string = ""
-        var Current : int = Value
+        # Calculate how many bytes are needed to represent the unsigned value
+        # GetBitWidth returns (Magnitude + 1) for positive numbers to account for the sign.
+        # The -2 strips the sign bit and aligns to 0-indexing.
+        ByteCount := Value = 0 and 1 or Quotient[GetBitWidth(Value) - 2, 8] + 1 or Err("Unreachable")
 
-        loop {
-            Current > 0 or (break)
-            set ResultHex = EncodeByteToHex[Mod[Current, 256]] + ResultHex or Err("Unreachable")
-            set Current = Quotient[Current, 256] or Err("Unreachable")
-        }
+        # 2. Iterate through the bytes from high to low
+        Concatenate(for (Index := 1..ByteCount) {
+            # We want to print Big-Endian (Most Significant Byte first)
+            # So we invert the index
+            BytePosition := ByteCount - Index
+            
+            # Calculate divisor: 2^(BytePosition * 8)
+            Divisor := PowerOfTwo[BytePosition * 8] or Err("Unreachable")
+            
+            # Extract the byte value (0-255)
+            ByteValue := Mod[Quotient[Value, Divisor], 256] or Err("Unreachable")
 
-        if (ResultHex.Length = 0). set ResultHex = "00"
-
-        ResultHex
+            EncodeByteToHex[ByteValue] or Err("Unreachable")
+        })
     }
 
     # Converts a hexadecimal string into its respective byte array
@@ -64,9 +72,9 @@ Hexadecimal<public> := module{
 
         Mod[HexLength, 2] = 0
 
-        ByteArray := for (Index := 0..(Truncate(HexLength / 2)) - 1) {
-            HighChar := HexString[Index * 2]
-            LowChar := HexString[(Index * 2) + 1]
+        for (Index := 0..(Truncate(HexLength / 2)) - 1) {
+            HighChar := HexString[Index * 2] or Err("Unreachable")
+            LowChar := HexString[(Index * 2) + 1] or Err("Unreachable")
 
             HighValue := ReverseHexTable[HighChar]
             LowValue := ReverseHexTable[LowChar]
@@ -84,10 +92,15 @@ Hexadecimal<public> := module{
     }
 
     # Decodes a hexadecimal string into its integer representation
-    # Fails if the input string has an odd length or contains invalid hexadecimal characters
+    # Fails if the input string is empty, has an odd length, or contains invalid hexadecimal characters
     DecodeHexToInt<public>(HexString:string)<decides><transacts>:int = {
         var Result : int = 0
-        for (Byte : DecodeHexToByteArray[HexString]) {
+
+        ByteArray := DecodeHexToByteArray[HexString]
+
+        ByteArray.Length > 0
+
+        for (Byte : ByteArray) {
             set Result = (Result * 256) + Byte
         }
 

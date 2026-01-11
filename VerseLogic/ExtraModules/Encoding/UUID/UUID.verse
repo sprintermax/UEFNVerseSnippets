@@ -29,7 +29,7 @@ GetUUIDGeneratorData<internal>()<transacts>:uuid_generator_data = {
     UUIDGeneratorData[Session] or (
         set UUIDGeneratorData[Session] = uuid_generator_data{
             LastTimestamp := GetSecondsSinceEpoch()
-            ClockSequence := GetRandomInt(0, 0x3FFF)
+            ClockSequence := Mod[GetRandomInt(0, 0x4000), 0x4000] or Err("Unreachable")
         }
     ) or Err("Unreachable")
 }
@@ -37,4 +37,8 @@ GetUUIDGeneratorData<internal>()<transacts>:uuid_generator_data = {
 uuid<public> := class<internal><abstract><computes> {
     Version<public> : int
     Variant<public> : int
+
+    (uuid:)ToString<public>()<transacts>:string
 }
+
+ToString<public>((local:)UUID:uuid)<transacts>:string = (local:)UUID.ToString()

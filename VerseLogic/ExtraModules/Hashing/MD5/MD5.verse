@@ -1,3 +1,5 @@
+using. /UnrealEngine.com/Temporary/Diagnostics
+
 using. BitMath
 using. Encoding.Hexadecimal
 using. MathFeatures
@@ -9,13 +11,6 @@ using. VerseFeatures
 # A cryptographic hash function that produces a 128-bit (16-byte) hash value.
 # Developed by Ronald Rivest in 1991. Now considered cryptographically broken,
 # but still widely used for checksums and non-security purposes.
-#
-# Algorithm Overview:
-# 1. Pad the input message to be a multiple of 512 bits (64 bytes)
-# 2. Initialize four 32-bit state variables (A, B, C, D)
-# 3. Process the message in 512-bit blocks
-# 4. Each block goes through 64 operations in 4 rounds
-# 5. Final state variables form the 128-bit hash output
 
 md5_scoped<internal> := scoped { MD5 }
 
@@ -131,7 +126,7 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
             
             FunctionResult := MixerFunction(WorkingB, WorkingC, WorkingD)
             Sum := Mod[WorkingA + FunctionResult + MessageWords[MessageWordIndex] + _MD5Constants.SineTable[GlobalIndex], _MathConstants.Max32BitUInt] or Err("Unreachable")
-            Rotated := LeftRotate(Sum, RotationAmounts[OperationIndex], ?BitCount := option{32}) or Err("Unreachable")
+            Rotated := LeftRotate(Sum, RotationAmounts.At[OperationIndex], ?BitCount := option{32}) or Err("Unreachable")
             NewA := Mod[WorkingB + Rotated, _MathConstants.Max32BitUInt] or Err("Unreachable")
 
             set WorkingA = WorkingD
@@ -240,14 +235,7 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
             ByteIndex := Mod[RawByteIndex, 4] or Err("Unreachable")
             Length32 := RawByteIndex < 4 and LengthLow32 or LengthHigh32
 
-            # Calculate 2^(ByteIndex * 8)
-            var Divisor : int = 1
-            for (Index := 0..(ByteIndex * 8) - 1) {
-                set Divisor *= 2
-            }
-
-            # WIP: Compare Performance with Pow function Instead of Loop
-            # Divisor := Int[Pow(2.0, (ByteIndex * 8) * 1.0)] or Err("Unreachable")
+            Divisor := PowerOfTwo[ByteIndex * 8] or Err("Unreachable")
 
             ByteValue := Mod[Quotient[Length32, Divisor], _MathConstants.Max32BitUInt] or Err("Unreachable")
             set PaddingBytes += array{Mod[ByteValue, 256]} or Err("Unreachable")
@@ -263,13 +251,7 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
         for (State : array{Self.StateA, Self.StateB, Self.StateC, Self.StateD}) {
             for (ByteIndex := 0..3) {
                 
-                # Calculate 2^(ByteIndex * 8)
-                var Divisor : int = 1
-                for (Index := 0..(ByteIndex * 8) - 1) {
-                    set Divisor *= 2
-                }
-
-                # Divisor := Int[Pow(2.0, (ByteIndex * 8) * 1.0)] or Err("Unreachable")
+                Divisor := PowerOfTwo[ByteIndex * 8] or Err("Unreachable")
                 
                 ByteValue := Mod[Quotient[State, Divisor], _MathConstants.Max32BitUInt] or Err("Unreachable")
                 set HashBytes += array{Mod[ByteValue, 256]} or Err("Unreachable")
@@ -282,7 +264,7 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
     }
 }
 
-ComputeMD5Hash<public>(InputString:string):string = {
+ComputeMD5Hash<public>(InputString:string)<transacts>:string = {
     # Create a new MD5 digest for hashing the input
     HashDigest := NewDigest()
 

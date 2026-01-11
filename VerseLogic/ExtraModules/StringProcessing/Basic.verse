@@ -18,12 +18,31 @@ using. VerseFeatures
     String.Slice[0, String.Length - Suffix.Length]
 }
 
+# Converts a character to its corresponding Unicode code point (bytes 0-255)
 CharToInt<public>(Character:char)<computes>:int = {
     UTF8CodeUnits[Character] or Err("Unreachable")
 }
 
+# Converts an Unicode code point (bytes 0-255) to its corresponding character
+# Fails if the input is outside the byte range
 IntToChar<public>(CharacterCode:int)<decides><transacts>:char = {
     UTF8CodeUnits.FindKeyByValue[CharacterCode]
+}
+
+PadLeft<public>(String:string, TargetLength:int, PadCharacter:char)<computes>:string = {
+    NeededCharacters := TargetLength - String.Length 
+
+    PaddingString := for (X := 0..NeededCharacters - 1) { PadCharacter }
+
+    PaddingString + String
+}
+
+PadRight<public>(String:string, TargetLength:int, PadCharacter:char)<computes>:string = {
+    NeededCharacters := TargetLength - String.Length 
+
+    PaddingString := for (X := 0..NeededCharacters - 1) { PadCharacter }
+
+    String + PaddingString
 }
 
 # Supposed to be '.Find()', using '.Locate()' due to verse limitations

@@ -22,4 +22,10 @@ uuid_v3<public> := class<internal><computes><final>(uuid) {
     MD5High<public> : int                   # 48 bits
     MD5Mid<public> : int                    # 12 bits
     MD5Low<public> : int                    # 62 bits
+
+    
+
+    (uuid:)ToString<override>()<computes>:string = {
+        ""
+    }
 }

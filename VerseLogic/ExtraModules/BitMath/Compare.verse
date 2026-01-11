@@ -1,18 +1,16 @@
 # This is a internal handler for bitwise comparison operations to avoid code duplication
-BitwiseBaseHandler<internal>(A:int, B:int, BitwiseCondition:type{_(:int, :int)<decides><transacts>:void})<transacts>:int = {
+BitwiseBaseHandler<internal>(A:int, B:int, BitwiseCondition:type{_(:int, :int)<computes><decides>:void})<transacts>:int = {
     # Get the minimum Bit Width needed to represent both Values
-    BitWidth := GetBitWidth(A, B)
+    BitWidth := GetCommonBitWidth(A, B)
 
-    # Ensure both values are represented as positives for the operation
-    var UnsignedA : int = ToPositiveRepresentation(A, BitWidth)
-    var UnsignedB : int = ToPositiveRepresentation(B, BitWidth)
+    # Ensure both values are represented as unsigned for the operation
+    var UnsignedA : int = ToPositiveRepresentation[A, BitWidth] or Err("Unreachable")
+    var UnsignedB : int = ToPositiveRepresentation[B, BitWidth] or Err("Unreachable")
 
     var Result : int = 0
     var BitPosition : int = 1
 
-    loop {
-        UnsignedA > 0 or UnsignedB > 0 or (break)
-
+    for (X := 1..BitWidth) {
         BitA := Mod[UnsignedA, 2] or Err("Unreachable")
         BitB := Mod[UnsignedB, 2] or Err("Unreachable")
 
@@ -27,7 +25,7 @@ BitwiseBaseHandler<internal>(A:int, B:int, BitwiseCondition:type{_(:int, :int)<d
     }
 
     # Convert back to signed representation if needed
-    return FromPositiveRepresentation(Result, BitWidth)
+    return FromPositiveRepresentation[Result, BitWidth] or Err("Unreachable")
 }
 
 # Compares if both of the bits are 1
@@ -93,31 +91,46 @@ BitwiseXor<public>(A:int, B:int)<transacts>:int = {
 }
 
 # Performs Bitwise NOT operation on an integer
-BitwiseNot<public>(Value:int)<transacts>:int = {
-    # Get the minimum Bit Width needed to represent the Value
-    BitWidth := GetBitWidth(Value)
-
-    # Ensure the values is represented as positive for the operation
-    var UnsignedValue : int = ToPositiveRepresentation(Value, BitWidth)
-
-    var Result : int = 0
-    var BitPosition : int = 1
-
-    for (Index := 0..BitWidth - 1) {
-        Bit := Mod[UnsignedValue, 2] or Err("Unreachable")
-
-        # Compute the Bitwise OR Condition for the current bit
-        if (BitwiseNotCondition[Bit]) {
-            set Result += BitPosition
-        }
-
-        set BitPosition *= 2
-        set UnsignedValue = Quotient[UnsignedValue, 2] or Err("Unreachable")
-    }
-
-    # Convert back to signed representation if needed
-    return FromPositiveRepresentation(Result, BitWidth)
+# (Two’s Complement, for Signed Integers)
+BitwiseNot<public>(Value:int)<computes>:int = {
+    return -1 - Value
 }
+
+# Performs Bitwise NOT operation on an integer
+# (Alternative Method - With Bit Width for Unsigned Integers)
+# Fails if BitWidth is negative
+BitwiseNot<public>(Value:int, BitWidth:int)<computes><decides><reads>:int = {
+    BitWidth >= 0
+    return PowerOfTwo[BitWidth] - 1 - Value or Err("Unreachable")
+}
+
+# Performs Bitwise NOT operation on an integer
+# (Old Approach - Slower)
+# BitwiseNot<public>(Value:int)<transacts>:int = {
+#     # Get the minimum Bit Width needed to represent the Value
+#     BitWidth := GetBitWidth(Value)
+
+#     # Ensure the values is represented as positive for the operation
+#     var UnsignedValue : int = ToPositiveRepresentation(Value, BitWidth)
+
+#     var Result : int = 0
+#     var BitPosition : int = 1
+
+#     for (X := 1..BitWidth) {
+#         Bit := Mod[UnsignedValue, 2] or Err("Unreachable")
+
+#         # Compute the Bitwise OR Condition for the current bit
+#         if (BitwiseNotCondition[Bit]) {
+#             set Result += BitPosition
+#         }
+
+#         set BitPosition *= 2
+#         set UnsignedValue = Quotient[UnsignedValue, 2] or Err("Unreachable")
+#     }
+
+#     # Convert back to signed representation if needed
+#     return FromPositiveRepresentation(Result, BitWidth)
+# }
 
 # Performs Bitwise NAND operation between two integers
 BitwiseNand<public>(A:int, B:int)<transacts>:int = {
@@ -139,3 +152,13 @@ BitwiseXnor<public>(A:int, B:int)<transacts>:int = {
 
     return BitwiseBaseHandler(A, B, BitwiseXnorCondition)
 }
+
+# Aliases for operator style usage (can't be like `operator'&'` due to verse limitations)
+_'~'<public>(Value:int)<transacts>:int = BitwiseNot(Value)
+_'^'<public>(A:int, B:int)<transacts>:int = BitwiseXor(A, B)
+_'|'<public>(A:int, B:int)<transacts>:int = BitwiseOr(A, B)
+_'&'<public>(A:int, B:int)<transacts>:int = BitwiseAnd(A, B)
+(Value:int)._'~'<public>()<transacts>:int = BitwiseNot(Value)
+(A:int)._'^'<public>(B:int)<transacts>:int = BitwiseXor(A, B)
+(A:int)._'|'<public>(B:int)<transacts>:int = BitwiseOr(A, B)
+(A:int)._'&'<public>(B:int)<transacts>:int = BitwiseAnd(A, B)

@@ -8,8 +8,8 @@ using. ExtraModules.MathFeatures
 using. ExtraModules.NoiseUtils
 using. ExtraModules.UnrealEngineFeatures
 
-# Simple device made to test and play with perlin noise algorythms
-noise_tests_device<internal> := class<final>(creative_device) {
+# Simple device made to play with perlin noise algorithm
+noise_generator_device<internal> := class<final>(creative_device) {
 
     DebugDraw : debug_draw = debug_draw{}
 
