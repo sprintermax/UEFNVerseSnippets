@@ -30,15 +30,15 @@ uuid_v1<public> := class<internal><computes><final>(uuid) {
 
     TimeLow<public> : int                   # 32 bits
     TimeMid<public> : int                   # 16 bits
-    TimeHigh<public> : int                  # 12 bits
+    TimeHigh<public> : int                  # 12 bits (+4 from Version)
     
-    ClockSeq<public> : int                  # 14 bits
+    ClockSeq<public> : int                  # 14 bits (+2 from Variant)
     Node<public> : int                      # 48 bits
 
     # If true the node was randomly generated, else it's MAC address based
     IsRandomNode<public> : logic
 
-    (uuid:)ToString<override>()<transacts>:string = {
+    (uuid:)ToString<override>()<computes><reads>:string = {
         VersionTimeHigh := Version * 0x1000 + TimeHigh
         VariantClockSeq := Variant * 0x4000 + ClockSeq
 

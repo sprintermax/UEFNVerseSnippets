@@ -20,7 +20,7 @@ GetCommonBitWidth<public>(A:int, B:int)<computes><reads>:int = {
     # Optimization for Zero and -1 values
     if ((A = 0 or A = -1) and (B = 0 or B = -1)). return 1
 
-    # If one is Zero 0r -1, just calculate for the other
+    # If one is Zero or -1, just calculate for the other
     if (A = 0 or A = -1). return GetBitWidth(B)
     if (B = 0 or B = -1). return GetBitWidth(A)
 

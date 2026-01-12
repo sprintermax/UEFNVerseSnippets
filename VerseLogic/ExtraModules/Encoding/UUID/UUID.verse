@@ -38,7 +38,7 @@ uuid<public> := class<internal><abstract><computes> {
     Version<public> : int
     Variant<public> : int
 
-    (uuid:)ToString<public>()<transacts>:string
+    (uuid:)ToString<public>()<computes><reads>:string
 }
 
-ToString<public>((local:)UUID:uuid)<transacts>:string = (local:)UUID.ToString()
+ToString<public>((local:)UUID:uuid)<computes><reads>:string = (local:)UUID.ToString()

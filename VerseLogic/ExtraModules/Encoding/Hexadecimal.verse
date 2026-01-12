@@ -45,9 +45,7 @@ Hexadecimal<public> := module{
         Value >= 0
 
         # Calculate how many bytes are needed to represent the unsigned value
-        # GetBitWidth returns (Magnitude + 1) for positive numbers to account for the sign.
-        # The -2 strips the sign bit and aligns to 0-indexing.
-        ByteCount := Value = 0 and 1 or Quotient[GetBitWidth(Value) - 2, 8] + 1 or Err("Unreachable")
+        ByteCount := Value = 0 and 1 or Quotient[GetBitWidth(Value) + 8, 8] or Err("Unreachable")
 
         # 2. Iterate through the bytes from high to low
         Concatenate(for (Index := 1..ByteCount) {
@@ -57,11 +55,18 @@ Hexadecimal<public> := module{
             
             # Calculate divisor: 2^(BytePosition * 8)
             Divisor := PowerOfTwo[BytePosition * 8] or Err("Unreachable")
-            
-            # Extract the byte value (0-255)
-            ByteValue := Mod[Quotient[Value, Divisor], 256] or Err("Unreachable")
 
-            EncodeByteToHex[ByteValue] or Err("Unreachable")
+            # Shift the value down to this byte position
+            # This gives us the value of this byte AND all bytes above it
+            ShiftedValue := Quotient[Value, Divisor]
+
+            # If ShiftedValue is 0, it means this byte (and all above it) are 0.
+            # We skip it (return empty string) UNLESS it's the very last byte (Divisor=1).
+            # This ensures '0' prints as "00" but '0xFF' prints as "FF" (not "00FF").
+            (ShiftedValue > 0 or Divisor = 1) and (
+                ByteValue := Mod[ShiftedValue, 256] or Err("Unreachable")
+                EncodeByteToHex[ByteValue] or Err("Unreachable")
+            ) or ""
         })
     }
 
