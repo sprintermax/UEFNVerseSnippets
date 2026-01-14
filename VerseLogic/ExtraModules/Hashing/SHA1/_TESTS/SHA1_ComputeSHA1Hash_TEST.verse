@@ -3,8 +3,8 @@ using. /Verse.org/Simulation
 
 using. BitMath
 
-MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creative_device) {
-    TestName<private> : string = "<MD5.MD5.ComputeMD5Hash(:string)>"
+SHA1_SHA1_ComputeSHA1Hash_TEST<internal> := class<internal><concrete><final>(creative_device) {
+    TestName<private> : string = "<SHA1.SHA1.ComputeSHA1Hash(:string)>"
 
     GetLogPrefix<private>(Prefix:string, ?IsBenchmark:logic=false, ?IsProfile:logic=false)<computes>:string = {
         LogType := if (IsBenchmark?) { 
@@ -15,31 +15,31 @@ MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creati
         "{LogType}{Prefix}{Prefix.Length > 0 and " " or ""}{TestName}"
     }
 
-    # Array of tuple(<Input String>, <Expected MD5 Hash>)
+    # Array of tuple(<Input String>, <Expected SHA1 Hash>)
     TestCases<private> : []tuple(string, string) = array{
         # 1. Empty String (Crucial for padding logic)
-        ("", "d41d8cd98f00b204e9800998ecf8427e")
+        ("", "da39a3ee5e6b4b0d3255bfef95601890afd80709")
 
         # 2. Single Characters
-        ("a", "0cc175b9c0f1b6a831c399e269772661")
-        ("z", "fbade9e36a3f36d3d676c1b808451dd7")
+        ("a", "86f7e437faa5a7fce15d1ddcb9eaeaea377667b8")
+        ("z", "395df8f7c51f007019cb30201c49e884b46b92fa")
 
         # # 3. Short Strings
-        ("abc", "900150983cd24fb0d6963f7d28e17f72")
-        ("hello", "5d41402abc4b2a76b9719d911017c592")
-        ("message digest", "f96b697d7cb7938d525a2f31aaf161d0")
+        ("abc", "a9993e364706816aba3e25717850c26c9cd0d89d")
+        ("hello", "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d")
+        ("message digest", "c12252ceda8be8994d5fa0290a47231c1d16aae3")
 
         # # 4. Longer Strings (For multi-block processing)
-        ("abcdefghijklmnopqrstuvwxyz", "c3fcd3d76192e4007dfb496cca67e13b")
-        ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", "d174ab98d277d9f5a5611c2c9f419d9f")
+        ("abcdefghijklmnopqrstuvwxyz", "32d10c7b8cf96570ca04ce37f2a19d84240d3a89")
+        ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", "761c457bf73b14d27e9e9265c46f4b4dda11f940")
         
         # # 5. Numerical/Symbolic Strings
-        ("12345678901234567890123456789012345678901234567890123456789012345678901234567890", "57edf4a22be3c955ac49da2e2107b67a")
-        ("!@#$%^&*()", "05b28d17a7b6e7024b6e5d8cc43a8bf7")
+        ("12345678901234567890123456789012345678901234567890123456789012345678901234567890", "50abf5706a150990a08b2c5ea40fa0e585554732")
+        ("!@#$%^&*()", "bf24d65c9bb05b9b814a966940bcfa50767c8a8d")
 
         # # 6. Fox Test
-        ("The quick brown fox jumps over the lazy dog", "9e107d9d372bb6826bd81d3542a419d6")
-        ("The quick brown fox jumps over the lazy dog.", "e4d909c290d0fb1ca068ffaddf22cbd0")
+        ("The quick brown fox jumps over the lazy dog", "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12")
+        ("The quick brown fox jumps over the lazy dog.", "408d94384216f890ff7a0c3528e8bed1e0b01621")
     }
 
     OnBegin<override>()<suspends>:void = {
@@ -54,7 +54,7 @@ MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creati
 
         for (
             # 0..7 = (1, 2, 4, 8, 16, 32, 64, 128) Iterations
-            X := 0..3 # Just 3 (8 Iterations) because MD5 is slow and triggers verse timeout
+            X := 0..1 # Just 1 (2 Iterations) because SHA1 is slow and triggers verse timeout
             Iterations := PowerOfTwo[X] or Err("Unreachable")
         ) {
             Sleep(0.0)
@@ -82,7 +82,7 @@ MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creati
             Input := TestCase(0)
             Expected := TestCase(1)
 
-            Received := ComputeMD5HashString(Input)
+            Received := ComputeSHA1HashString(Input)
 
             if (not IsBenchmark?) {
                 if (Expected = Received) {

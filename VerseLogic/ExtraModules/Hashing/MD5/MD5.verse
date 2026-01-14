@@ -20,14 +20,16 @@ NewDigest<public><constructor>()<computes><allocates> := digest_md5{}
 
 # Maintains the state of an ongoing MD5 hash computation.
 # Allows incremental hashing of data in multiple chunks.
-digest_md5<public> := class<internal><concrete><computes><allocates><final> {
+digest_md5<public> := class<internal><concrete><computes><allocates><final>(digest) {
 
     # The four 32-bit state registers that hold the evolving hash value
     # Initially set to magic constants, modified by each block processed
-    var<private> StateA<private>:int = _MD5Constants.InitialStateA
-    var<private> StateB<private>:int = _MD5Constants.InitialStateB
-    var<private> StateC<private>:int = _MD5Constants.InitialStateC
-    var<private> StateD<private>:int = _MD5Constants.InitialStateD
+    var<private> DigestStates<private>:[]int = array{
+        _MD5Constants.InitialStateA
+        _MD5Constants.InitialStateB
+        _MD5Constants.InitialStateC
+        _MD5Constants.InitialStateD
+    }
 
     # Temporary buffer to accumulate bytes until having a complete 64-byte block
     # MD5 processes data in 512-bit (64-byte) chunks
@@ -42,14 +44,22 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
     var<private> TotalBytesProcessed<private>:int = 0
 
     # Check if no data has been processed yet
-    IsEmpty<public>()<computes><decides><reads>:void = Self.TotalBytesProcessed = 0
+    IsEmpty<override>()<computes><decides><reads>:void = Self.TotalBytesProcessed = 0
+
+    # Get the block size used by the hash function in bytes
+    GetBlockSize<override>()<computes><reads>:int = _MD5Constants.BlockSize
+
+    # Get the size of the final hash output in bytes
+    GetHashSize<override>()<computes><reads>:int = _MD5Constants.HashSize
 
     # Reset the digest to initial state (for reusing the same object)
-    Reset<public>()<transacts>:void = {
-        set Self.StateA = _MD5Constants.InitialStateA
-        set Self.StateB = _MD5Constants.InitialStateB
-        set Self.StateC = _MD5Constants.InitialStateC
-        set Self.StateD = _MD5Constants.InitialStateD
+    Reset<override>()<transacts>:void = {
+        set Self.DigestStates = array{
+            _MD5Constants.InitialStateA
+            _MD5Constants.InitialStateB
+            _MD5Constants.InitialStateC
+            _MD5Constants.InitialStateD
+        }
         set Self.BlockBuffer = array{}
         set Self.BytesInBuffer = 0
         set Self.TotalBytesProcessed = 0
@@ -79,79 +89,72 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
         }
 
         # STEP 2: Initialize working variables with current state
-        var CurrentState : []int = array{ Self.StateA, Self.StateB, Self.StateC, Self.StateD }
+        var WorkingStates : []int = Self.DigestStates
 
         # STEP 3: Execute 64 operations in 4 rounds
         #
         # Each round uses a different function (F, G, H, or I) and processes
         # the message words in a different order for thorough mixing.
-        
 
         # ROUND 1: Operations 0-15 using function F
-        Round1Result := ExecuteRound(CurrentState, 0, FunctionF, MessageWords, _MD5Constants.RotationAmountsRound1)
+        set WorkingStates = ExecuteRound(WorkingStates, 0, FunctionF, MessageWords, _MD5Constants.RotationAmountsRound1)
         # ROUND 2: Operations 16-31 using function G
-        Round2Result := ExecuteRound(Round1Result, 16, FunctionG, MessageWords, _MD5Constants.RotationAmountsRound2, ?MessageWordIndices := option{_MD5Constants.MessageWordIndicesRound2})
+        set WorkingStates = ExecuteRound(WorkingStates, 16, FunctionG, MessageWords, _MD5Constants.RotationAmountsRound2, ?MessageWordIndices := option{_MD5Constants.MessageWordIndicesRound2})
         # ROUND 3: Operations 32-47 using function H
-        Round3Result := ExecuteRound(Round2Result, 32, FunctionH, MessageWords, _MD5Constants.RotationAmountsRound3, ?MessageWordIndices := option{_MD5Constants.MessageWordIndicesRound3})
+        set WorkingStates = ExecuteRound(WorkingStates, 32, FunctionH, MessageWords, _MD5Constants.RotationAmountsRound3, ?MessageWordIndices := option{_MD5Constants.MessageWordIndicesRound3})
         # ROUND 4: Operations 48-63 using function I
-        Round4Result := ExecuteRound(Round3Result, 48, FunctionI, MessageWords, _MD5Constants.RotationAmountsRound4, ?MessageWordIndices := option{_MD5Constants.MessageWordIndicesRound4})
-
+        set WorkingStates = ExecuteRound(WorkingStates, 48, FunctionI, MessageWords, _MD5Constants.RotationAmountsRound4, ?MessageWordIndices := option{_MD5Constants.MessageWordIndicesRound4})
 
         # STEP 4: Add working variables back to state (with wraparound)
         # This ensures the hash accumulates information from all blocks
-        set Self.StateA = Mod[Self.StateA + Round4Result[0], _MathConstants.Max32BitUInt] or Err("Unreachable")
-        set Self.StateB = Mod[Self.StateB + Round4Result[1], _MathConstants.Max32BitUInt] or Err("Unreachable")
-        set Self.StateC = Mod[Self.StateC + Round4Result[2], _MathConstants.Max32BitUInt] or Err("Unreachable")
-        set Self.StateD = Mod[Self.StateD + Round4Result[3], _MathConstants.Max32BitUInt] or Err("Unreachable")
+        set Self.DigestStates = for (Index := 0..3) {
+            Mod[Self.DigestStates[Index] + WorkingStates[Index], _MathConstants.Max32BitUInt] or Err("Unreachable")
+        }
     }
 
     # Util function to execute one round of 16 MD5 operations.
     # Applies the specified mixer function and handles round-specific details.
     ExecuteRound<private>(
-        CurrentState:[]int,
-        GlobalIndexOffset:int,
+        CurrentStates:[]int,
+        IndexOffset:int,
         MixerFunction:type{_(:int, :int, :int)<transacts>:int},
         MessageWords:[]int,
         RotationAmounts:[]int,
         ?MessageWordIndices:?[]int = false
     )<transacts>:[]int = {
-        var WorkingA:int = CurrentState[0] or Err("Unreachable")
-        var WorkingB:int = CurrentState[1] or Err("Unreachable")
-        var WorkingC:int = CurrentState[2] or Err("Unreachable")
-        var WorkingD:int = CurrentState[3] or Err("Unreachable")
+        var WorkingStates : []int = CurrentStates
 
         for (OperationIndex := 0..15) {
-            GlobalIndex := GlobalIndexOffset + OperationIndex
+            GlobalIndex := IndexOffset + OperationIndex
             MessageWordIndex := MessageWordIndices?[OperationIndex] or OperationIndex
             
-            FunctionResult := MixerFunction(WorkingB, WorkingC, WorkingD)
-            Sum := Mod[WorkingA + FunctionResult + MessageWords[MessageWordIndex] + _MD5Constants.SineTable[GlobalIndex], _MathConstants.Max32BitUInt] or Err("Unreachable")
+            FunctionResult := MixerFunction(WorkingStates[1], WorkingStates[2], WorkingStates[3]) or Err("Unreachable")
+            Sum := Mod[WorkingStates[0] + FunctionResult + MessageWords[MessageWordIndex] + _MD5Constants.SineTable[GlobalIndex], _MathConstants.Max32BitUInt] or Err("Unreachable")
             Rotated := LeftRotate(Sum, RotationAmounts.At[OperationIndex], ?BitCount := option{32}) or Err("Unreachable")
-            NewA := Mod[WorkingB + Rotated, _MathConstants.Max32BitUInt] or Err("Unreachable")
+            NewB := Mod[WorkingStates[1] + Rotated, _MathConstants.Max32BitUInt] or Err("Unreachable")
 
-            set WorkingA = WorkingD
-            set WorkingD = WorkingC
-            set WorkingC = WorkingB
-            set WorkingB = NewA
+            set WorkingStates = array{
+                WorkingStates[3] or Err("Unreachable")
+                NewB
+                WorkingStates[1] or Err("Unreachable")
+                WorkingStates[2] or Err("Unreachable")
+            }
         }
 
-        return array{WorkingA, WorkingB, WorkingC, WorkingD}
+        WorkingStates
     }
 
     # Add the input string to the hash computation.
-    WriteString<public>(Input:string)<transacts>:void = {
-        ByteArray := for (Character : Input) {
-            CharToInt(Character)
-        }
-
+    WriteString<override>(Input:string)<transacts>:void = {
+        ByteArray := StringToByteArray(Input)
         Self.WriteRawBytes(ByteArray)
     }
 
     # Add data to the hash computation. Data is buffered until we have
     # complete 64-byte blocks to process.
-    WriteRawBytes<public>(Bytes:[]int)<transacts>:void = {
-        var RemainingData : []int = Bytes
-        set Self.TotalBytesProcessed += Bytes.Length
+    WriteRawBytes<override>(BytesToWrite:[]int)<transacts>:void = {
+        var RemainingData : []int = BytesToWrite
+        set Self.TotalBytesProcessed += BytesToWrite.Length
 
         # If buffer already has some data, try to fill it to 64 bytes
         if (Self.BytesInBuffer > 0) {
@@ -197,9 +200,16 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
         }
     }
 
-    # Complete the hash computation by applying MD5 padding and returning
+    # Complete the hash computation by applying paddings and returning
     # the final 128-bit (16-byte) hash value as a hex string.
-    Finalize<public>()<transacts>:string = {
+    FinalizeHex<override>()<transacts>:string = {
+        RawBytes := FinalizeRaw()
+        EncodeByteArrayToHex[RawBytes] or Err("Unreachable")
+    }
+
+    # Complete the hash computation by applying paddings and returning
+    # the final 128-bit (16-byte) hash value as a raw byte array.
+    FinalizeRaw<override>()<transacts>:[]int = {
         # STEP 1: Create padding
         #
         # MD5 padding format:
@@ -223,7 +233,6 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
         }
 
         # Append message length in bits as 64-bit little-endian integer
-        # Message length in bits = TotalBytesProcessed * 8
         MessageLengthInBits := Self.TotalBytesProcessed * 8
         
         # Split into low 32 bits and high 32 bits
@@ -248,7 +257,7 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
         var HashBytes:[]int = array{}
 
         # Extract each state variable as 4 bytes (little-endian)
-        for (State : array{Self.StateA, Self.StateB, Self.StateC, Self.StateD}) {
+        for (State : Self.DigestStates) {
             for (ByteIndex := 0..3) {
                 
                 Divisor := PowerOfTwo[ByteIndex * 8] or Err("Unreachable")
@@ -258,19 +267,25 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final> {
             }
         }
 
-        Concatenate(for (Byte : HashBytes) {
-            EncodeByteToHex[Byte, ?LowerCase := true] or Err("Unreachable")
-        })
+        HashBytes
     }
 }
 
-ComputeMD5Hash<public>(InputString:string)<transacts>:string = {
+# Computes the MD5 hash for a given input byte array.
+ComputeMD5HashRaw<public>(InputBytes:[]int)<transacts>:[]int = {
     # Create a new MD5 digest for hashing the input
     HashDigest := NewDigest()
 
-    # Feed the string into the MD5 digest
-    HashDigest.WriteString(InputString)
+    # Feed the raw bytes into the MD5 digest
+    HashDigest.WriteRawBytes(InputBytes)
 
     # Finalize the hash and get the resulting MD5
-    HashDigest.Finalize()
+    HashDigest.FinalizeRaw()
+}
+
+# Computes the MD5 hash for a given input string.
+ComputeMD5HashString<public>(InputString:string)<transacts>:string = {
+    InputByteArray := StringToByteArray(InputString)
+    OutputByteArray := ComputeMD5HashRaw(InputByteArray)
+    EncodeByteArrayToHex[OutputByteArray] or Err("Unreachable")
 }

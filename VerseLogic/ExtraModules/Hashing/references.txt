@@ -1,1 +1,5 @@
-# https://decodeit.app/en/hash/md5-generator
+https://www.rfc-editor.org/rfc/rfc2104
+https://decodeit.app/en/hash/md5-generator
+https://www.sha1generator.com/
+https://en.wikipedia.org/wiki/HMAC
+https://codebeautify.org/sha1-hash-generator

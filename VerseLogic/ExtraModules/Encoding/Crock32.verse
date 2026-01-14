@@ -46,7 +46,7 @@ Crock32<public> := module {
         for (Character : String, Character <> '-') {
             array{'O', 'o'}.Find[Character] and '0' or
             array{'L', 'l', 'I', 'i'}.Find[Character] and '1' or (
-                CharacterCode := CharToInt(Character)
+                CharacterCode := CharToByte(Character)
 
                 option{
                     digit_characters_range[CharacterCode]
@@ -60,7 +60,7 @@ Crock32<public> := module {
                         lowercase_characters_range[CharacterCode]
                         UpperCaseOffset := CharacterCode - 32
                         uppercase_characters_range[UpperCaseOffset]
-                        IntToChar[UpperCaseOffset]
+                        ByteToChar[UpperCaseOffset]
                     }?
                 }?
             )

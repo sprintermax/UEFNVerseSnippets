@@ -24,24 +24,32 @@ Hexadecimal<public> := module{
         "{HighNibble}{LowNibble}"
     }
 
+    # Converts a byte array to its hexadecimal string representation
+    EncodeByteArrayToHex<public>(Bytes:[]int, ?LowerCase:logic=false)<computes><decides>:string = {
+        HexParts := for (Byte : Bytes) {
+            EncodeByteToHex[Byte, ?LowerCase := true]
+        }
+        Concatenate(HexParts)
+    }
+
     # Converts a single char to its two-character hexadecimal representation
-    EncodeCharToHex<public>(Character:char)<computes>:string = {
-        ByteValue := CharToInt(Character)
+    EncodeCharToHex<public>(Character:char, ?LowerCase:logic=false)<computes>:string = {
+        ByteValue := CharToByte(Character)
         
-        EncodeByteToHex[ByteValue] or Err("Unreachable")
+        EncodeByteToHex[ByteValue, ?LowerCase := LowerCase] or Err("Unreachable")
     }
 
     # Converts a string to its hexadecimal string representation
-    EncodeStringToHex<public>(String:string)<computes>:string = {
-        HexBytes := for (Character : String) {
-            EncodeCharToHex(Character)
+    EncodeStringToHex<public>(String:string, ?LowerCase:logic=false)<computes>:string = {
+        HexParts := for (Character : String) {
+            EncodeCharToHex(Character, ?LowerCase := LowerCase)
         }
-        Concatenate(HexBytes)
+        Concatenate(HexParts)
     }
 
     # Converts an arbitrary-sized integer to its hexadecimal string representation
     # Fails if the input integer is negative
-    EncodeIntToHex<public>(Value:int)<computes><decides><reads>:string = {
+    EncodeIntToHex<public>(Value:int, ?LowerCase:logic=false)<computes><decides><reads>:string = {
         Value >= 0
 
         # Calculate how many bytes are needed to represent the unsigned value
@@ -65,7 +73,7 @@ Hexadecimal<public> := module{
             # This ensures '0' prints as "00" but '0xFF' prints as "FF" (not "00FF").
             (ShiftedValue > 0 or Divisor = 1) and (
                 ByteValue := Mod[ShiftedValue, 256] or Err("Unreachable")
-                EncodeByteToHex[ByteValue] or Err("Unreachable")
+                EncodeByteToHex[ByteValue, ?LowerCase := LowerCase] or Err("Unreachable")
             ) or ""
         })
     }
@@ -91,9 +99,8 @@ Hexadecimal<public> := module{
     # Decodes a hexadecimal string into its normal byte string representation
     # Fails if the input string has an odd length or contains invalid hexadecimal characters
     DecodeHexToString<public>(HexString:string)<decides><transacts>:string = {
-        for (Byte : DecodeHexToByteArray[HexString]) {
-            IntToChar[Byte]
-        }
+        ByteArray := DecodeHexToByteArray[HexString]
+        ByteArrayToString[ByteArray] or Err("Unreachable")
     }
 
     # Decodes a hexadecimal string into its integer representation

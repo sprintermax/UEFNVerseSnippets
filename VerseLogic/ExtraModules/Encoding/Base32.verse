@@ -46,7 +46,7 @@ Base32<public> := module {
 
                 var Bits : int = 0
                 for (X := 0..4) {
-                    set Bits = (Bits * 256) + CharToInt(Source[SourceIndex + X]) or Err("Unreachable")
+                    set Bits = (Bits * 256) + CharToByte(Source[SourceIndex + X]) or Err("Unreachable")
                 }
 
                 for (Shift : Shifts) {
@@ -63,7 +63,7 @@ Base32<public> := module {
             block {
                 var Bits : int = 0
                 for (X := 0..RemainingBytes - 1) {
-                    set Bits = (Bits * 256) + CharToInt(Source[SourceIndex + X]) or Err("Unreachable")
+                    set Bits = (Bits * 256) + CharToByte(Source[SourceIndex + X]) or Err("Unreachable")
                 }
 
                 set Bits = BitwiseLeftShift(Bits, (5 - RemainingBytes) * 8)
@@ -121,7 +121,7 @@ Base32<public> := module {
                     
                     for (X := 0..4) {
                         Shift := 32 - (X * 8)
-                        set Result += array{IntToChar[BitwiseAnd(BitwiseRightShift(Bits, Shift), 0xFF)]} or (set DecodeError = true; break)
+                        set Result += array{ByteToChar[BitwiseAnd(BitwiseRightShift(Bits, Shift), 0xFF)]} or (set DecodeError = true; break)
                     }
                     
                     set SourceIndex += 8
@@ -144,7 +144,7 @@ Base32<public> := module {
 
                     for (X := 0..ByteCount - 1) {
                         Shift := 32 - (X * 8)
-                        set Result += array{IntToChar[BitwiseAnd(BitwiseRightShift(Bits, Shift), 0xFF)]} or Err("Unreachable")
+                        set Result += array{ByteToChar[BitwiseAnd(BitwiseRightShift(Bits, Shift), 0xFF)]} or Err("Unreachable")
                     }
                 }
             }
@@ -160,7 +160,7 @@ Base32<public> := module {
     # Fails if the string contains invalid Base32 characters.
     Normalize<public>(String:string)<decides><transacts>:string = {
         for (Character : String) {
-            CharacterCode := CharToInt(Character)
+            CharacterCode := CharToByte(Character)
 
             option{
                 digit_characters_range[CharacterCode]
@@ -174,7 +174,7 @@ Base32<public> := module {
                     lowercase_characters_range[CharacterCode]
                     UpperCaseOffset := CharacterCode - 32
                     uppercase_characters_range[UpperCaseOffset]
-                    IntToChar[UpperCaseOffset]
+                    ByteToChar[UpperCaseOffset]
                 }?
             }?
         }

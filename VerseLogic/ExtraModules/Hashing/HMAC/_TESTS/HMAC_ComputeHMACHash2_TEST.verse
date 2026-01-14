@@ -3,8 +3,8 @@ using. /Verse.org/Simulation
 
 using. BitMath
 
-MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creative_device) {
-    TestName<private> : string = "<MD5.MD5.ComputeMD5Hash(:string)>"
+HMAC_HMAC_ComputeHMACHash2_TEST<internal> := class<internal><concrete><final>(creative_device) {
+    TestName<private> : string = "<HMAC.HMAC.ComputeHMACHash2(:string)>"
 
     GetLogPrefix<private>(Prefix:string, ?IsBenchmark:logic=false, ?IsProfile:logic=false)<computes>:string = {
         LogType := if (IsBenchmark?) { 
@@ -15,31 +15,20 @@ MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creati
         "{LogType}{Prefix}{Prefix.Length > 0 and " " or ""}{TestName}"
     }
 
-    # Array of tuple(<Input String>, <Expected MD5 Hash>)
-    TestCases<private> : []tuple(string, string) = array{
-        # 1. Empty String (Crucial for padding logic)
-        ("", "d41d8cd98f00b204e9800998ecf8427e")
-
-        # 2. Single Characters
-        ("a", "0cc175b9c0f1b6a831c399e269772661")
-        ("z", "fbade9e36a3f36d3d676c1b808451dd7")
-
-        # # 3. Short Strings
-        ("abc", "900150983cd24fb0d6963f7d28e17f72")
-        ("hello", "5d41402abc4b2a76b9719d911017c592")
-        ("message digest", "f96b697d7cb7938d525a2f31aaf161d0")
-
-        # # 4. Longer Strings (For multi-block processing)
-        ("abcdefghijklmnopqrstuvwxyz", "c3fcd3d76192e4007dfb496cca67e13b")
-        ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", "d174ab98d277d9f5a5611c2c9f419d9f")
-        
-        # # 5. Numerical/Symbolic Strings
-        ("12345678901234567890123456789012345678901234567890123456789012345678901234567890", "57edf4a22be3c955ac49da2e2107b67a")
-        ("!@#$%^&*()", "05b28d17a7b6e7024b6e5d8cc43a8bf7")
-
-        # # 6. Fox Test
-        ("The quick brown fox jumps over the lazy dog", "9e107d9d372bb6826bd81d3542a419d6")
-        ("The quick brown fox jumps over the lazy dog.", "e4d909c290d0fb1ca068ffaddf22cbd0")
+    # Array of tuple(<Input Key>, <Input String> <Expected HMAC SHA1 Hash>)
+    TestCases<private> : []tuple(string, string, string) = array{
+        # Common Test Cases
+        ("Jefe", "what do ya want for nothing?", "effcdf6ae5eb2fa2d27416d5f184df9c259a7c79")
+        ("key", "The quick brown fox jumps over the lazy dog", "de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9")
+        ("The cat is looking at something", "This is some cool information that will be hashed for testing purposes.", "a655c5eae3ae03b654586a11fc207551f0385ca7")
+        # Empty Key and Message
+        ("", "", "fbdb1d1b18aa6c08324b7d64b71fb76370690e1d")
+        # Empty Key
+        ("", "Test", "2440c41268d23719f0e0d0fa3514819a5e30d0aa")
+        # Empty Message
+        ("Key", "", "e5aaeae4c3010aa2bef0ba1e67cd67bf818ac7ff")
+        # Key longer than block size
+        ("LongKeyLongKeyLongKeyLongKeyLongKeyLongKeyLongKeyLongKeyLongKeyLongKeyLongKeyLongKey", "Message", "a7400edb5d3a4166b010ebb92a1a4a58ed430131")
     }
 
     OnBegin<override>()<suspends>:void = {
@@ -54,7 +43,7 @@ MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creati
 
         for (
             # 0..7 = (1, 2, 4, 8, 16, 32, 64, 128) Iterations
-            X := 0..3 # Just 3 (8 Iterations) because MD5 is slow and triggers verse timeout
+            X := 0..0 # Just 0 (1 Iterations) because HMAC/SHA1 is slow and triggers verse timeout
             Iterations := PowerOfTwo[X] or Err("Unreachable")
         ) {
             Sleep(0.0)
@@ -79,10 +68,11 @@ MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creati
         var FailedResults : [int]string = map{}
 
         for (Index->TestCase : TestCases) {
-            Input := TestCase(0)
-            Expected := TestCase(1)
+            InputKey := TestCase(0)
+            InputString := TestCase(1)
+            Expected := TestCase(2)
 
-            Received := ComputeMD5HashString(Input)
+            Received := ComputeHMACHashString(InputKey, InputString, SHA1.digest_sha1)
 
             if (not IsBenchmark?) {
                 if (Expected = Received) {

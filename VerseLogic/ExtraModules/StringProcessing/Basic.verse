@@ -18,14 +18,29 @@ using. VerseFeatures
     String.Slice[0, String.Length - Suffix.Length]
 }
 
+# Converts a byte array into its respective string
+# Fails if any byte is outside the byte range
+ByteArrayToString<public>(ByteArray:[]int)<decides><transacts>:string = {
+    for (Byte : ByteArray) {
+        ByteToChar[Byte]
+    }
+}
+
+# Converts a string into its respective byte array
+StringToByteArray<public>(Input:string)<computes>:[]int = {
+    for (Character : Input) {
+        CharToByte(Character)
+    }
+}
+
 # Converts a character to its corresponding Unicode code point (bytes 0-255)
-CharToInt<public>(Character:char)<computes>:int = {
+CharToByte<public>(Character:char)<computes>:int = {
     UTF8CodeUnits[Character] or Err("Unreachable")
 }
 
 # Converts an Unicode code point (bytes 0-255) to its corresponding character
 # Fails if the input is outside the byte range
-IntToChar<public>(CharacterCode:int)<decides><transacts>:char = {
+ByteToChar<public>(CharacterCode:int)<decides><transacts>:char = {
     UTF8CodeUnits.FindKeyByValue[CharacterCode]
 }
 
@@ -200,12 +215,15 @@ PadRight<public>(String:string, TargetLength:int, PadCharacter:char)<computes>:s
 
 # NOTE: Needs to be qualified due to verse wrongly conflicting with other functions
 (StringProcessing:)Concatenate<public>(Strings:[]string, Separator:string)<computes>:string = {
-    Concatenate(for (Index->String : Strings) {
-        option{
-            Index + 1 < Strings.Length
-            String + Separator
-        }? or String
-    })
+    Separator.Length = 0 and Concatenate(Strings) or (
+        StringParts := for (Index->String : Strings) {
+            option{
+                Index + 1 < Strings.Length
+                String + Separator
+            }? or String
+        }
+        Concatenate(StringParts)
+    )
 }
 
 
@@ -228,7 +246,7 @@ IsCharacterRange<public>(CharacterCode:int, ExpectedCharacterRange:type{_(:int)<
 }
 
 IsCharacterRange<public>(Character:char, ExpectedCharacterRange:type{_(:int)<computes><decides>:any})<computes><decides>:char = {
-    IsCharacterRange[CharToInt(Character), ExpectedCharacterRange]
+    IsCharacterRange[CharToByte(Character), ExpectedCharacterRange]
     Character
 }
 
@@ -249,11 +267,11 @@ IsCharacterRangeAll<public>(CharacterCode:int, ExpectedCharacterRanges:[]type{_(
 }
 
 IsCharacterRangeAny<public>(Character:char, ExpectedCharacterRanges:[]type{_(:int)<computes><decides>:any})<computes><decides>:char = {
-    IsCharacterRangeAny[CharToInt(Character), ExpectedCharacterRanges]
+    IsCharacterRangeAny[CharToByte(Character), ExpectedCharacterRanges]
     Character
 }
 
 IsCharacterRangeAll<public>(Character:char, ExpectedCharacterRanges:[]type{_(:int)<computes><decides>:any})<computes><decides>:char = {
-    IsCharacterRangeAll[CharToInt(Character), ExpectedCharacterRanges]
+    IsCharacterRangeAll[CharToByte(Character), ExpectedCharacterRanges]
     Character
 }

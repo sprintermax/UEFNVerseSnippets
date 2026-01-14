@@ -1,6 +1,6 @@
 using. BitMath
 
-# These ur auxiliary functions mix the bits in different ways.
+# These four auxiliary functions mix the bits in different ways.
 # Each function takes three 32-bit values and produces one 32-bit result.
 # They are used in the four rounds of the MD5 algorithm.
 
