@@ -42,8 +42,15 @@ digest_sha1<public> := class<internal><concrete><computes><allocates><final>(dig
     # Used in the final padding step to encode message length.
     var<private> TotalBytesProcessed<private>:int = 0
 
+    # Internal flag indicating if the digest is locked (finalized)
+    var<private> IsLockedInternal<private> : logic = false
+
     # Check if no data has been processed yet
     IsEmpty<override>()<computes><decides><reads>:void = Self.TotalBytesProcessed = 0
+
+    # Succeeds if the digest is currently locked, preventing further writes
+    # (Can be unlocked later by calling Reset())
+    IsLocked<override>()<computes><decides><reads>:void = Self.IsLockedInternal
 
     # Get the block size used by the hash function in bytes
     GetBlockSize<override>()<computes><reads>:int = _SHA1Constants.BlockSize
@@ -63,6 +70,7 @@ digest_sha1<public> := class<internal><concrete><computes><allocates><final>(dig
         set Self.BlockBuffer = array{}
         set Self.BytesInBuffer = 0
         set Self.TotalBytesProcessed = 0
+        set Self.IsLockedInternal = false
     }
 
     # Processes a single 64-byte (512-bit) block through the SHA-1 algorithm.
@@ -156,17 +164,17 @@ digest_sha1<public> := class<internal><concrete><computes><allocates><final>(dig
         WorkingStates
     }
 
-    # Add the input string to the hash computation.
-    WriteString<override>(Input:string)<transacts>:void = {
-        ByteArray := StringToByteArray(Input)
-        Self.WriteRawBytes(ByteArray)
-    }
-
     # Add data to the hash computation. Data is buffered until we have
     # complete 64-byte blocks to process.
-    WriteRawBytes<override>(BytesToWrite:[]int)<transacts>:void = {
-        var RemainingData : []int = BytesToWrite
-        set Self.TotalBytesProcessed += BytesToWrite.Length
+    # Fails if the digest is Locked or if BytesToWrite contains invalid byte values
+    Write<override>(BytesToWrite:[]int)<decides><transacts>:void = {
+        not Self.IsLockedInternal?
+
+        var RemainingData : []int = for (Byte : BytesToWrite) {
+            # We validate the byte values are in 0-255 range and fail otherwise
+            Byte >= 0 and Byte <= 255
+        }
+        set Self.TotalBytesProcessed += RemainingData.Length
 
         # If buffer already has some data, try to fill it to 64 bytes
         if (Self.BytesInBuffer > 0) {
@@ -213,15 +221,14 @@ digest_sha1<public> := class<internal><concrete><computes><allocates><final>(dig
     }
 
     # Complete the hash computation by applying paddings and returning
-    # the final 160-bit (20-byte) hash value as a hex string.
-    FinalizeHex<override>()<transacts>:string = {
-        RawBytes := FinalizeRaw()
-        EncodeByteArrayToHex[RawBytes] or Err("Unreachable")
-    }
-
-    # Complete the hash computation by applying paddings and returning
     # the final 160-bit (20-byte) hash value as a raw byte array.
-    FinalizeRaw<override>()<transacts>:[]int = {
+    # Fails if the digest is Locked
+    Finalize<override>()<decides><transacts>:[]int = {
+        not Self.IsLockedInternal?
+        defer {
+            set Self.IsLockedInternal = true
+        }
+
         # STEP 1: Create padding
         #
         # SHA-1 padding format:
@@ -272,7 +279,7 @@ digest_sha1<public> := class<internal><concrete><computes><allocates><final>(dig
         }
 
         # Process the padding
-        WriteRawBytes(PaddingBytes)
+        Write[PaddingBytes] or Err("Unreachable")
 
         # STEP 2: Convert final state to hex string (big-endian)
         var HashBytes:[]int = array{}
@@ -294,20 +301,14 @@ digest_sha1<public> := class<internal><concrete><computes><allocates><final>(dig
 }
 
 # Computes the SHA-1 hash for a given input byte array.
-ComputeSHA1HashRaw<public>(InputBytes:[]int)<transacts>:[]int = {
+# Fails if InputBytes contain invalid byte values
+ComputeSHA1Hash<public>(InputBytes:[]int)<decides><transacts>:[]int = {
     # Create a new SHA-1 digest for hashing the input
     HashDigest := NewDigest()
 
     # Feed the raw bytes into the SHA-1 digest
-    HashDigest.WriteRawBytes(InputBytes)
+    HashDigest.Write[InputBytes]
 
     # Finalize the hash and get the resulting SHA-1
-    HashDigest.FinalizeRaw()
-}
-
-# Computes the SHA-1 hash for a given input string.
-ComputeSHA1HashString<public>(InputString:string)<transacts>:string = {
-    InputByteArray := StringToByteArray(InputString)
-    OutputByteArray := ComputeSHA1HashRaw(InputByteArray)
-    EncodeByteArrayToHex[OutputByteArray] or Err("Unreachable")
+    HashDigest.Finalize[] or Err("Unreachable")
 }

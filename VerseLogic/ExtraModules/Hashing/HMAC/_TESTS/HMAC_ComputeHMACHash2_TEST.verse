@@ -2,6 +2,8 @@ using. /Fortnite.com/Devices
 using. /Verse.org/Simulation
 
 using. BitMath
+using. Encoding.Hexadecimal
+using. StringProcessing
 
 HMAC_HMAC_ComputeHMACHash2_TEST<internal> := class<internal><concrete><final>(creative_device) {
     TestName<private> : string = "<HMAC.HMAC.ComputeHMACHash2(:string)>"
@@ -72,7 +74,7 @@ HMAC_HMAC_ComputeHMACHash2_TEST<internal> := class<internal><concrete><final>(cr
             InputString := TestCase(1)
             Expected := TestCase(2)
 
-            Received := ComputeHMACHashString(InputKey, InputString, SHA1.digest_sha1)
+            Received := EncodeByteArrayToHex[ComputeHMACHash[StringToByteArray(InputKey), StringToByteArray(InputString), SHA1.digest_sha1], ?LowerCase := true] or Err("Unreachable")
 
             if (not IsBenchmark?) {
                 if (Expected = Received) {

@@ -2,6 +2,8 @@ using. /Fortnite.com/Devices
 using. /Verse.org/Simulation
 
 using. BitMath
+using. Encoding.Hexadecimal
+using. StringProcessing
 
 MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creative_device) {
     TestName<private> : string = "<MD5.MD5.ComputeMD5Hash(:string)>"
@@ -82,7 +84,7 @@ MD5_MD5_ComputeMD5Hash_TEST<internal> := class<internal><concrete><final>(creati
             Input := TestCase(0)
             Expected := TestCase(1)
 
-            Received := ComputeMD5HashString(Input)
+            Received := EncodeByteArrayToHex[ComputeMD5Hash[StringToByteArray(Input)], ?LowerCase := true] or Err("Unreachable")
 
             if (not IsBenchmark?) {
                 if (Expected = Received) {

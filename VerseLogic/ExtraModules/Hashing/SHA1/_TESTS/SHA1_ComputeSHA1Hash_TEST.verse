@@ -2,6 +2,8 @@ using. /Fortnite.com/Devices
 using. /Verse.org/Simulation
 
 using. BitMath
+using. Encoding.Hexadecimal
+using. StringProcessing
 
 SHA1_SHA1_ComputeSHA1Hash_TEST<internal> := class<internal><concrete><final>(creative_device) {
     TestName<private> : string = "<SHA1.SHA1.ComputeSHA1Hash(:string)>"
@@ -82,7 +84,7 @@ SHA1_SHA1_ComputeSHA1Hash_TEST<internal> := class<internal><concrete><final>(cre
             Input := TestCase(0)
             Expected := TestCase(1)
 
-            Received := ComputeSHA1HashString(Input)
+            Received := EncodeByteArrayToHex[ComputeSHA1Hash[StringToByteArray(Input)], ?LowerCase := true] or Err("Unreachable")
 
             if (not IsBenchmark?) {
                 if (Expected = Received) {

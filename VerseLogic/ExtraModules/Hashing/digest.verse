@@ -1,11 +1,15 @@
 
 
 # Abstract base class for hash digest implementations.
-# WIP: Make it abstract and remove default implementations.
+# WIP: Make it abstract and remove default implementations. (impossible currently due to verse limitations)
 # (Verse does not allow making concrete classes from abstract classes of other modules)
 digest<public> := class<internal><#<abstract>#><computes><allocates> {
     # Check if no data has been processed yet
     IsEmpty<public>()<computes><decides><reads>:void = {}
+
+    # Succeeds if the digest is currently locked, preventing further writes
+    # (Can be unlocked later by calling Reset)
+    IsLocked<public>()<computes><decides><reads>:void = {}
 
     # Get the block size used by the hash function in bytes
     GetBlockSize<public>()<computes><reads>:int = { 0 }
@@ -16,18 +20,12 @@ digest<public> := class<internal><#<abstract>#><computes><allocates> {
     # Reset the digest to initial state (for reusing the same object)
     Reset<public>()<transacts>:void = {}
 
-    # Add the input string to the hash computation.
-    WriteString<public>(Input:string)<transacts>:void = {}
-
     # Add data to the hash computation.
-    # WIP: Fail if BytesToWrite contains invalid byte values.
-    WriteRawBytes<public>(BytesToWrite:[]int)<transacts>:void = {}
+    # Fails if the digest is Locked or if BytesToWrite contains invalid byte values
+    Write<public>(BytesToWrite:[]int)<decides><transacts>:void = {}
 
-    # Complete the hash computation and returns the
-    # final hash value as a hex string.
-    FinalizeHex<public>()<transacts>:string = { "" }
-
-    # Complete the hash computation and returns the
-    # final hash value as a raw byte array.
-    FinalizeRaw<public>()<transacts>:[]int = { array{} }
+    # Complete the hash computation and returns the final hash value as
+    # a raw byte array and locks the digest preventing further writes.
+    # Fails if the digest is Locked
+    Finalize<public>()<decides><transacts>:[]int = { array{} }
 }

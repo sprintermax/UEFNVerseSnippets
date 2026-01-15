@@ -43,8 +43,15 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final>(dige
     # Used in the final padding step to encode message length
     var<private> TotalBytesProcessed<private>:int = 0
 
+    # Internal flag indicating if the digest is locked (finalized)
+    var<private> IsLockedInternal<private> : logic = false
+
     # Check if no data has been processed yet
     IsEmpty<override>()<computes><decides><reads>:void = Self.TotalBytesProcessed = 0
+
+    # Succeeds if the digest is currently locked, preventing further writes
+    # (Can be unlocked later by calling Reset())
+    IsLocked<override>()<computes><decides><reads>:void = Self.IsLockedInternal
 
     # Get the block size used by the hash function in bytes
     GetBlockSize<override>()<computes><reads>:int = _MD5Constants.BlockSize
@@ -63,6 +70,7 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final>(dige
         set Self.BlockBuffer = array{}
         set Self.BytesInBuffer = 0
         set Self.TotalBytesProcessed = 0
+        set Self.IsLockedInternal = false
     }
 
     # Processes a single 64-byte (512-bit) block through the MD5 algorithm.
@@ -144,17 +152,17 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final>(dige
         WorkingStates
     }
 
-    # Add the input string to the hash computation.
-    WriteString<override>(Input:string)<transacts>:void = {
-        ByteArray := StringToByteArray(Input)
-        Self.WriteRawBytes(ByteArray)
-    }
-
     # Add data to the hash computation. Data is buffered until we have
     # complete 64-byte blocks to process.
-    WriteRawBytes<override>(BytesToWrite:[]int)<transacts>:void = {
-        var RemainingData : []int = BytesToWrite
-        set Self.TotalBytesProcessed += BytesToWrite.Length
+    # Fails if the digest is Locked or if BytesToWrite contains invalid byte values
+    Write<override>(BytesToWrite:[]int)<decides><transacts>:void = {
+        not Self.IsLockedInternal?
+
+        var RemainingData : []int = for (Byte : BytesToWrite) {
+            # We validate the byte values are in 0-255 range and fail otherwise
+            Byte >= 0 and Byte <= 255
+        }
+        set Self.TotalBytesProcessed += RemainingData.Length
 
         # If buffer already has some data, try to fill it to 64 bytes
         if (Self.BytesInBuffer > 0) {
@@ -201,15 +209,14 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final>(dige
     }
 
     # Complete the hash computation by applying paddings and returning
-    # the final 128-bit (16-byte) hash value as a hex string.
-    FinalizeHex<override>()<transacts>:string = {
-        RawBytes := FinalizeRaw()
-        EncodeByteArrayToHex[RawBytes] or Err("Unreachable")
-    }
-
-    # Complete the hash computation by applying paddings and returning
     # the final 128-bit (16-byte) hash value as a raw byte array.
-    FinalizeRaw<override>()<transacts>:[]int = {
+    # Fails if the digest is Locked
+    Finalize<override>()<decides><transacts>:[]int = {
+        not Self.IsLockedInternal?
+        defer {
+            set Self.IsLockedInternal = true
+        }
+
         # STEP 1: Create padding
         #
         # MD5 padding format:
@@ -251,7 +258,7 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final>(dige
         }
 
         # Process the padding
-        WriteRawBytes(PaddingBytes)
+        Write[PaddingBytes] or Err("Unreachable")
 
         # STEP 2: Convert final state to hex string (little-endian byte order)
         var HashBytes:[]int = array{}
@@ -272,20 +279,14 @@ digest_md5<public> := class<internal><concrete><computes><allocates><final>(dige
 }
 
 # Computes the MD5 hash for a given input byte array.
-ComputeMD5HashRaw<public>(InputBytes:[]int)<transacts>:[]int = {
+# Fails if InputBytes contain invalid byte values
+ComputeMD5Hash<public>(InputBytes:[]int)<decides><transacts>:[]int = {
     # Create a new MD5 digest for hashing the input
     HashDigest := NewDigest()
 
     # Feed the raw bytes into the MD5 digest
-    HashDigest.WriteRawBytes(InputBytes)
+    HashDigest.Write[InputBytes]
 
     # Finalize the hash and get the resulting MD5
-    HashDigest.FinalizeRaw()
-}
-
-# Computes the MD5 hash for a given input string.
-ComputeMD5HashString<public>(InputString:string)<transacts>:string = {
-    InputByteArray := StringToByteArray(InputString)
-    OutputByteArray := ComputeMD5HashRaw(InputByteArray)
-    EncodeByteArrayToHex[OutputByteArray] or Err("Unreachable")
+    HashDigest.Finalize[] or Err("Unreachable")
 }

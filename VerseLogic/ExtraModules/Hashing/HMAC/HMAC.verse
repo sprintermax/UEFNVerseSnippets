@@ -14,7 +14,8 @@ using. StringProcessing
 # Creates a new HMAC digest object for incremental hashing
 # with the provided key in raw bytes and hash digest class.
 # Useful when you want to hash data in multiple chunks
-NewDigestRaw<public><constructor>(KeyBytes:[]int, hasher_digest:concrete_subtype(digest))<transacts> := digest_hmac{
+# # Fails if KeyBytes contains invalid byte values
+NewDigest<public><constructor>(KeyBytes:[]int, hasher_digest:concrete_subtype(digest))<decides><transacts> := digest_hmac{
     let {
         # NOTE: need to do `(concrete_subtype(digest)(hasher)){}` instead of just `hasher_digest{}` due to verse bug
         Digest := (concrete_subtype(digest)(hasher_digest)){}
@@ -23,12 +24,15 @@ NewDigestRaw<public><constructor>(KeyBytes:[]int, hasher_digest:concrete_subtype
 
         # Process the key to ensure it fits the block size
 
-        var FixedKeyBytes : []int = KeyBytes
+        var FixedKeyBytes : []int = for (Byte : KeyBytes) {
+            # We validate the byte values are in 0-255 range and fail otherwise
+            Byte >= 0 and Byte <= 255
+        }
 
         # If key is longer than block size, hash it
         _Guard_Bigger := if (FixedKeyBytes.Length > BlockSize) {
-            Digest.WriteRawBytes(FixedKeyBytes)
-            HashedKey := Digest.FinalizeRaw()
+            Digest.Write[FixedKeyBytes] or Err("Unreachable")
+            HashedKey := Digest.Finalize[] or Err("Unreachable")
             Digest.Reset()
             set FixedKeyBytes = HashedKey
         }
@@ -49,24 +53,13 @@ NewDigestRaw<public><constructor>(KeyBytes:[]int, hasher_digest:concrete_subtype
             set OuterPadKey += array{BitwiseXor(Byte, 0x5C)}
         }
 
-        _Guard_Init := Digest.WriteRawBytes(InnerPadKey)
+        _Guard_Init := Digest.Write[InnerPadKey] or Err("Unreachable")
     }
 
     HasherDigest := Digest
 
     InnerPadKey := InnerPadKey
     OuterPadKey := OuterPadKey
-}
-
-# Creates a new HMAC digest object for incremental hashing
-# with the provided key string and hash digest class.
-# Useful when you want to hash data in multiple chunks
-NewDigestString<public><constructor>(Key:string, hasher_digest:concrete_subtype(digest))<transacts> := digest_hmac{
-    let {
-        ByteArray := StringToByteArray(Key)
-    }
-
-    NewDigestRaw<constructor>(ByteArray, hasher_digest)
 }
 
 # Maintains the state of an ongoing HMAC hash computation.
@@ -78,10 +71,21 @@ digest_hmac<public> := class<internal><computes><allocates><final>(digest) {
     InnerPadKey<internal> : []int
     OuterPadKey<internal> : []int
 
+    # Internal flag indicating if the digest is empty (no data written yet)
+    # This is needed instead of calling `HasherDigest.IsEmpty[]` because the
+    # HMAC requires writing the inner pad key at the start, so the underlying
+    # digest is never actually empty after initialization or reset.
     var<private> IsEmptyInternal<private> : logic = true
+
+    # Internal flag indicating if the digest is locked (finalized)
+    var<private> IsLockedInternal<private> : logic = false
 
     # Check if no data has been processed yet
     IsEmpty<override>()<computes><decides><reads>:void = Self.IsEmptyInternal?
+
+    # Succeeds if the digest is currently locked, preventing further writes
+    # (Can be unlocked later by calling Reset())
+    IsLocked<override>()<computes><decides><reads>:void = Self.IsLockedInternal
 
     # Get the block size used by the hash function in bytes
     GetBlockSize<override>()<computes><reads>:int = Self.HasherDigest.GetBlockSize()
@@ -92,67 +96,53 @@ digest_hmac<public> := class<internal><computes><allocates><final>(digest) {
     # Reset the digest to initial state (for reusing the same object)
     Reset<override>()<transacts>:void = {
         Self.HasherDigest.Reset()
-        Self.HasherDigest.WriteRawBytes(InnerPadKey)
+        Self.HasherDigest.Write[InnerPadKey] or Err("Unreachable")
+        set Self.IsLockedInternal = false
         set Self.IsEmptyInternal = true
     }
 
-    # Add the input string to the hash computation.
-    WriteString<override>(Input:string)<transacts>:void = {
-        Self.HasherDigest.WriteString(Input)
-        if (Self.IsEmptyInternal?, Input.Length > 0) {
-            set Self.IsEmptyInternal = false
-        }
-    }
-
     # Add data to the hash computation.
-    WriteRawBytes<override>(BytesToWrite:[]int)<transacts>:void = {
-        Self.HasherDigest.WriteRawBytes(BytesToWrite)
-        if (Self.IsEmptyInternal?, BytesToWrite.Length > 0) {
+    # Fails if the digest is Locked or if BytesToWrite contains invalid byte values
+    Write<override>(BytesToWrite:[]int)<decides><transacts>:void = {
+        not Self.IsLockedInternal?
+
+        Self.HasherDigest.Write[BytesToWrite]
+        
+        option{
+            Self.IsEmptyInternal?
+            BytesToWrite.Length > 0
             set Self.IsEmptyInternal = false
         }
-    }
-
-    # Finalize the HMAC computation by applying paddings and preparing for final hash.
-    FinalizeInternal<private>()<transacts>:void = {
-        HashedInner := Self.HasherDigest.FinalizeRaw()
-        Self.HasherDigest.Reset()
-
-        # STEP 4: Outer Hash
-        Self.HasherDigest.WriteRawBytes(Self.OuterPadKey)
-        Self.HasherDigest.WriteRawBytes(HashedInner)
-    }
-
-    # Complete the hash computation by applying paddings and returning
-    # the final hash value as a hex string.
-    FinalizeHex<override>()<transacts>:string = {
-        Self.FinalizeInternal()
-        Self.HasherDigest.FinalizeHex()
     }
 
     # Complete the hash computation by applying paddings and returning
     # the final hash value as a raw byte array.
-    FinalizeRaw<override>()<transacts>:[]int = {
-        Self.FinalizeInternal()
-        Self.HasherDigest.FinalizeRaw()
+    # Fails if the digest is Locked
+    Finalize<override>()<decides><transacts>:[]int = {
+        not Self.IsLockedInternal?
+        defer {
+            set Self.IsLockedInternal = true
+        }
+
+        HashedInner := Self.HasherDigest.Finalize[] or Err("Unreachable")
+        Self.HasherDigest.Reset()
+
+        # STEP 4: Outer Hash
+        Self.HasherDigest.Write[Self.OuterPadKey] or Err("Unreachable")
+        Self.HasherDigest.Write[HashedInner] or Err("Unreachable")
+        Self.HasherDigest.Finalize[] or Err("Unreachable")
     }
 }
 
 # Computes the HMAC signature for a given Secret Key and Message byte arrays with the specified hasher.
-ComputeHMACHashRaw<public>(KeyBytes:[]int, MessageBytes:[]int, hasher:concrete_subtype(digest))<transacts>:[]int = {
+# Fails if KeyBytes or MessageBytes contain invalid byte values
+ComputeHMACHash<public>(KeyBytes:[]int, MessageBytes:[]int, hasher:concrete_subtype(digest))<decides><transacts>:[]int = {
     # Create a new HMAC digest for hashing the input
-    HashDigest := NewDigestRaw(KeyBytes, hasher)
+    HashDigest := NewDigest[KeyBytes, hasher]
 
     # Feed the string into the MD5 digest
-    HashDigest.WriteRawBytes(MessageBytes)
+    HashDigest.Write[MessageBytes]
 
     # Finalize the hash and get the resulting byte array
-    HashDigest.FinalizeRaw()
-}
-
-# Computes the HMAC signature for a given Secret Key and Message strings with the specified hasher.
-ComputeHMACHashString<public>(Key:string, Message:string, hasher:concrete_subtype(digest))<transacts>:string = {
-    KeyBytes := StringToByteArray(Key)
-    MessageBytes := StringToByteArray(Message)
-    OutputByteArray := ComputeHMACHashRaw(KeyBytes, MessageBytes, hasher)
-    EncodeByteArrayToHex[OutputByteArray] or Err("Unreachable")
+    HashDigest.Finalize[] or Err("Unreachable")
 }

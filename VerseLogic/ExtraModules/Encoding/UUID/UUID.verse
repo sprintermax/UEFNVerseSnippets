@@ -12,7 +12,7 @@ uuid_generator_data<internal> := class<internal><computes><allocates> {
     var<private> ClockSequence<internal> : int
 
     Update<internal>()<transacts>:void = {
-        UnixSeconds := (/Verse.org/Verse:)GetSecondsSinceEpoch()
+        UnixSeconds := GetSecondsSinceEpoch()
         GregorianSeconds := UnixToGregorian(UnixSeconds)
         HundredNanoseconds := SecondsToHundredNanoseconds[GregorianSeconds] or Err("Unreachable")
 

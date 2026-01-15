@@ -25,13 +25,14 @@ Hexadecimal<public> := module{
     }
 
     # Converts a byte array to its hexadecimal string representation
-    EncodeByteArrayToHex<public>(Bytes:[]int, ?LowerCase:logic=false)<computes><decides>:string = {
-        HexParts := for (Byte : Bytes) {
-            EncodeByteToHex[Byte, ?LowerCase := true]
+    EncodeByteArrayToHex<public>(ByteArray:[]int, ?LowerCase:logic=false)<computes><decides>:string = {
+        HexParts := for (Byte : ByteArray) {
+            EncodeByteToHex[Byte, ?LowerCase := LowerCase]
         }
         Concatenate(HexParts)
     }
 
+    # WIP: Deprecate later (redundant)
     # Converts a single char to its two-character hexadecimal representation
     EncodeCharToHex<public>(Character:char, ?LowerCase:logic=false)<computes>:string = {
         ByteValue := CharToByte(Character)
@@ -39,6 +40,7 @@ Hexadecimal<public> := module{
         EncodeByteToHex[ByteValue, ?LowerCase := LowerCase] or Err("Unreachable")
     }
 
+    # WIP: Deprecate later (redundant)
     # Converts a string to its hexadecimal string representation
     EncodeStringToHex<public>(String:string, ?LowerCase:logic=false)<computes>:string = {
         HexParts := for (Character : String) {
@@ -47,6 +49,7 @@ Hexadecimal<public> := module{
         Concatenate(HexParts)
     }
 
+    # WIP: Deprecate later (redundant)
     # Converts an arbitrary-sized integer to its hexadecimal string representation
     # Fails if the input integer is negative
     EncodeIntToHex<public>(Value:int, ?LowerCase:logic=false)<computes><decides><reads>:string = {
@@ -96,6 +99,7 @@ Hexadecimal<public> := module{
         }
     }
 
+    # WIP: Deprecate later (redundant)
     # Decodes a hexadecimal string into its normal byte string representation
     # Fails if the input string has an odd length or contains invalid hexadecimal characters
     DecodeHexToString<public>(HexString:string)<decides><transacts>:string = {
@@ -103,6 +107,7 @@ Hexadecimal<public> := module{
         ByteArrayToString[ByteArray] or Err("Unreachable")
     }
 
+    # WIP: Deprecate later (redundant)
     # Decodes a hexadecimal string into its integer representation
     # Fails if the input string is empty, has an odd length, or contains invalid hexadecimal characters
     DecodeHexToInt<public>(HexString:string)<decides><transacts>:int = {
