@@ -11,3 +11,6 @@ https://github.com/lithammer/shortuuid
 https://github.com/edwingeng/wuid
 
 https://github.com/jbittel/base32-crockford/blob/master/base32_crockford.py
+https://dev.to/maxart2501/let-s-develop-a-qr-code-generator-part-i-basic-concepts-510a
+https://www.nayuki.io/page/creating-a-qr-code-step-by-step
+https://www.thonky.com/qr-code-tutorial/module-placement-matrix

@@ -16,19 +16,19 @@ Wrappers<public> := module {
     }
 
     wrapper_empty<internal>(PassThroughType:type)<computes> := class<computes> {
-        Proxy(Payload:PassThroughType):any = Callback()
-        Callback:type{_():any}
+        Proxy(Payload:PassThroughType):any = spawn { Callback() }
+        Callback:type{_()<suspends>:any}
     }
 
     wrapper_basic<internal>(PassThroughType:type, DataType:type)<computes> := class<computes> {
-        Proxy(Payload:PassThroughType):any = Callback(ExtraData)
-        Callback:type{_(:DataType):any}
+        Proxy(Payload:PassThroughType):any = spawn { Callback(ExtraData) }
+        Callback:type{_(:DataType)<suspends>:any}
         ExtraData:DataType
     }
 
-    wrapper_generic<internal>(PassThroughType:type, DataType:type, ReturnType:type)<computes> := class<computes> {
-        Proxy(Payload:PassThroughType):ReturnType = Callback(Payload, ExtraData)
-        Callback:type{_(:PassThroughType, :DataType):ReturnType}
+    wrapper_generic<internal>(PassThroughType:type, DataType:type)<computes> := class<computes> {
+        Proxy(Payload:PassThroughType):any = spawn { Callback(Payload, ExtraData) }
+        Callback:type{_(:PassThroughType, :DataType)<suspends>:any}
         ExtraData:DataType
     }
 
@@ -71,17 +71,17 @@ Wrappers<public> := module {
         }
     }
     
-    (Subscribable:subscribable(PassThroughType)).Subscribe<public>(Callback:type{_(:PassThroughType, :DataType):ReturnType}, ExtraData:DataType where PassThroughType:type, DataType:type, ReturnType:type)<transacts> : cancelable = {
-        Wrapper := wrapper_generic(PassThroughType, DataType, ReturnType) {ExtraData := ExtraData, Callback := Callback}
+    (Subscribable:subscribable(PassThroughType)).Subscribe<public>(Callback:type{_(:PassThroughType, :DataType)<suspends>:any}, Payload:DataType where PassThroughType:type, DataType:type)<transacts> : cancelable = {
+        Wrapper := wrapper_generic(PassThroughType, DataType) {Callback := Callback, ExtraData := Payload}
         Subscribable.Subscribe(Wrapper.Proxy)
     }
 
-    (Subscribable:subscribable(PassThroughType)).Invoke<public>((Callback:type{_():any}) where PassThroughType:type)<transacts> : cancelable = {
+    (Subscribable:subscribable(PassThroughType)).Invoke<public>((Callback:type{_()<suspends>:any}) where PassThroughType:type)<transacts> : cancelable = {
         Wrapper := wrapper_empty(PassThroughType) {Callback := Callback}
         Subscribable.Subscribe(Wrapper.Proxy)
     }
 
-    (Subscribable:subscribable(PassThroughType)).InvokeArgs<public>(Callback:type{_(:DataType):any}, Payload:DataType where PassThroughType:type, DataType:type) : cancelable = {
+    (Subscribable:subscribable(PassThroughType)).InvokeArgs<public>(Callback:type{_(:DataType)<suspends>:any}, Payload:DataType where PassThroughType:type, DataType:type)<transacts> : cancelable = {
         Wrapper := wrapper_basic(PassThroughType, DataType) {Callback := Callback, ExtraData := Payload}
         Subscribable.Subscribe(Wrapper.Proxy)
     }
