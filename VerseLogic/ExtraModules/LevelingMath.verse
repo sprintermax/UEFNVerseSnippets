@@ -2,7 +2,7 @@ LevelingMath<public> := module {
 
     # Parametric Leveling Curve Interface
     # https://www.desmos.com/calculator/bqb0hvzg1l
-    custom_curve_leveling_interface<public> := interface {
+    custom_curve_leveling_interface<public> := interface<computes> {
         Base<public> : float = 1.0
         Exponent<public> : float = 2.0
         MaxLevel<public> : float = Inf

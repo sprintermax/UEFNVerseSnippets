@@ -5,31 +5,46 @@ using. /Verse.org/Simulation
 
 Wrappers<public> := module {
 
-    instant_callback_wrapper_delayed<internal>(PassThroughType:type)<computes> := class {
+    instant_callback_wrapper_delayed<internal>(PassThroughType:type)<converges> := class {
         Proxy<internal>(Payload:PassThroughType)<suspends>:void = Callback.Signal(Payload)
         Callback<internal>:event(PassThroughType) = event(PassThroughType){}
     }
 
-    instant_callback_wrapper<internal>(PassThroughType:type)<computes> := class {
+    instant_callback_wrapper<internal>(PassThroughType:type)<converges> := class {
         Proxy<internal>(Payload:PassThroughType):void = Callback.Signal(Payload)
         Callback<internal>:event(PassThroughType) = event(PassThroughType){}
     }
 
-    wrapper_empty<internal>(PassThroughType:type)<computes> := class<computes> {
+    wrapper_empty<internal>(PassThroughType:type)<converges> := class<computes> {
         Proxy(Payload:PassThroughType):any = spawn { Callback() }
         Callback:type{_()<suspends>:any}
     }
 
-    wrapper_basic<internal>(PassThroughType:type, DataType:type)<computes> := class<computes> {
+    wrapper_basic<internal>(PassThroughType:type, DataType:type)<converges> := class<computes> {
         Proxy(Payload:PassThroughType):any = spawn { Callback(ExtraData) }
         Callback:type{_(:DataType)<suspends>:any}
         ExtraData:DataType
     }
 
-    wrapper_generic<internal>(PassThroughType:type, DataType:type)<computes> := class<computes> {
+    wrapper_generic<internal>(PassThroughType:type, DataType:type)<converges> := class<computes> {
         Proxy(Payload:PassThroughType):any = spawn { Callback(Payload, ExtraData) }
         Callback:type{_(:PassThroughType, :DataType)<suspends>:any}
         ExtraData:DataType
+    }
+
+    (Subscribable:subscribable(PassThroughType)).Subscribe<public>(Callback:type{_(:PassThroughType, :DataType)<suspends>:any}, Payload:DataType where PassThroughType:type, DataType:type)<transacts> : cancelable = {
+        Wrapper := wrapper_generic(PassThroughType, DataType) {Callback := Callback, ExtraData := Payload}
+        Subscribable.Subscribe(Wrapper.Proxy)
+    }
+
+    (Subscribable:subscribable(PassThroughType)).Invoke<public>((Callback:type{_()<suspends>:any}) where PassThroughType:type)<transacts> : cancelable = {
+        Wrapper := wrapper_empty(PassThroughType) {Callback := Callback}
+        Subscribable.Subscribe(Wrapper.Proxy)
+    }
+
+    (Subscribable:subscribable(PassThroughType)).InvokeArgs<public>(Callback:type{_(:DataType)<suspends>:any}, Payload:DataType where PassThroughType:type, DataType:type)<transacts> : cancelable = {
+        Wrapper := wrapper_basic(PassThroughType, DataType) {Callback := Callback, ExtraData := Payload}
+        Subscribable.Subscribe(Wrapper.Proxy)
     }
 
     (Awaitable:awaitable(t)).Await<public>(MaxTimeout:float where t:type)<suspends>:?t = {
@@ -70,24 +85,9 @@ Wrappers<public> := module {
             }
         }
     }
-    
-    (Subscribable:subscribable(PassThroughType)).Subscribe<public>(Callback:type{_(:PassThroughType, :DataType)<suspends>:any}, Payload:DataType where PassThroughType:type, DataType:type)<transacts> : cancelable = {
-        Wrapper := wrapper_generic(PassThroughType, DataType) {Callback := Callback, ExtraData := Payload}
-        Subscribable.Subscribe(Wrapper.Proxy)
-    }
-
-    (Subscribable:subscribable(PassThroughType)).Invoke<public>((Callback:type{_()<suspends>:any}) where PassThroughType:type)<transacts> : cancelable = {
-        Wrapper := wrapper_empty(PassThroughType) {Callback := Callback}
-        Subscribable.Subscribe(Wrapper.Proxy)
-    }
-
-    (Subscribable:subscribable(PassThroughType)).InvokeArgs<public>(Callback:type{_(:DataType)<suspends>:any}, Payload:DataType where PassThroughType:type, DataType:type)<transacts> : cancelable = {
-        Wrapper := wrapper_basic(PassThroughType, DataType) {Callback := Callback, ExtraData := Payload}
-        Subscribable.Subscribe(Wrapper.Proxy)
-    }
 
     # Not using built-in 'subscribable()' and 'cancelable()' interfaces because of current verse limitations
-    subscription_task<public>(t:type)<computes> := class<internal> {
+    subscription_task<public>(t:type)<converges> := class<internal> {
         Callback<internal>:type{_(:t):void}
         Proxy<internal>:event(t)
 
@@ -113,7 +113,7 @@ Wrappers<public> := module {
         }
     }
 
-    subscribable_event<public>(t:type)<computes> := class(
+    subscribable_event<public>(t:type)<converges> := class(
         awaitable(t),
         signalable(t)
     ) {
