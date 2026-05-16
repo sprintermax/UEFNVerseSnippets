@@ -1,12 +1,12 @@
 using. /Verse.org/Simulation
 
-activatable_interface<public> := interface {
+activatable_interface<public> := interface<public> {
 
     @editable
     ActivationDelay<public> : ?type{_X : float where _X >= 0.0, _X <= 0.3} = false
 
-    ActivateEvent<protected> : event()
-    CancelActivationEvent<protected> : event()
+    ActivateEvent<public> : event()
+    CancelActivationEvent<public> : event()
 
     Activate<public>()<suspends>:void = {
         race {
