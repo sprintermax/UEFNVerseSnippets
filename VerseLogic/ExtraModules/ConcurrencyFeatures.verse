@@ -3,6 +3,10 @@ using. /Verse.org/Simulation
 
 ConcurrencyFeatures<public> := module {
 
+    AwaitableHandler<public>(Awaitable:awaitable(t) where t:type)<suspends>:t = Awaitable.Await()
+
+    # Race between all elements of the array: returns the result of
+    # the first to complete, and cancel all other running handlers
     ArrayRace<public>(Array:[]t, HandlerFunction(Element:t)<suspends>:u where t:type, u:type)<suspends>:u = {
         if (
             Array.Length > 1
@@ -22,6 +26,8 @@ ConcurrencyFeatures<public> := module {
         }
     }
 
+    # Rush between all elements of the array: returns the result of the
+    # first to complete, without cancelling the other running handlers
     ArrayRush<public>(Array:[]t, HandlerFunction(Element:t)<suspends>:u where t:type, u:type)<suspends>:u = {
         if (
             Array.Length > 1
@@ -41,6 +47,8 @@ ConcurrencyFeatures<public> := module {
         }
     }
 
+    # Sync between all elements of the array: waits for all the
+    # handlers to complete, then return an array with all the results
     ArraySync<public>(Array:[]t, HandlerFunction(Element:t)<suspends>:u where t:type, u:type)<suspends>:[]u = {
         if (
             Array.Length > 1
@@ -59,6 +67,43 @@ ConcurrencyFeatures<public> := module {
             array{HandlerFunction(FirstElement)}
         } else {
             array{}
+        }
+    }
+
+    (Awaitable:awaitable(t)).Await<public>(MaxTimeout:float where t:type)<suspends>:?t = {
+        race {
+            (EventData := Awaitable.Await(); option{EventData})
+            (Sleep(MaxTimeout); false)
+        }
+    }
+
+    (Awaitable:awaitable(t)).AwaitFor<public>((Query:t, ?MaxTimeout:float=Inf) where t:subtype(comparable))<suspends>:logic = {
+        race {
+            (loop {
+                EventData := Awaitable.Await()
+                if (EventData = Query). break
+            }; true)
+            (Sleep(MaxTimeout); false)
+        }
+    }
+
+    (Awaitable:awaitable(t)).AwaitForCondition<public>((Condition:type{_(:t)<reads><decides>:any}, ?MaxTimeout:float=Inf) where t:type)<suspends>:logic = {
+        race {
+            (loop {
+                EventData := Awaitable.Await()
+                if (Condition[EventData]). break
+            }; true)
+            (Sleep(MaxTimeout); false)
+        }
+    }
+
+    (Awaitable:awaitable(t)).AwaitForCondition<public>((Condition:type{_(:t, :t2)<reads><decides>:any}, Args:t2, ?MaxTimeout:float=Inf) where t:type, t2:type)<suspends>:logic = {
+        race {
+            (loop {
+                EventData := Awaitable.Await()
+                if (Condition[EventData, Args]). break
+            }; true)
+            (Sleep(MaxTimeout); false)
         }
     }
 }
